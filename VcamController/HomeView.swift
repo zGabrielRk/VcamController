@@ -189,31 +189,23 @@ struct HomeView: View {
         pendingThumbnail = nil
         pendingURL = nil
 
-        // VideoTransferable.importing copia o arquivo para documentDirectory
-        // antes de retornar — o URL retornado é estável e persiste até o Apply
-        Task {
-            defer {
-                Task { @MainActor in
-                    isLoading = false
-                    pickerItems = []
-                }
-            }
-            do {
-                guard let video = try await item.loadTransferable(type: VideoTransferable.self) else {
-                    await MainActor.run {
-                        alertMessage = "Vídeo inválido ou formato não suportado."
-                        showAlert = true
+        // Callback igual ao app que funcionou — /tmp persiste durante a sessão
+        item.loadTransferable(type: VideoTransferable.self) { result in
+            DispatchQueue.main.async {
+                self.isLoading = false
+                self.pickerItems = []
+                switch result {
+                case .success(let video):
+                    if let url = video?.url {
+                        self.pendingURL = url
+                        self.generateLocalThumb(from: url)
+                    } else {
+                        self.alertMessage = "Vídeo inválido ou formato não suportado."
+                        self.showAlert = true
                     }
-                    return
-                }
-                await MainActor.run {
-                    pendingURL = video.url
-                    generateLocalThumb(from: video.url)
-                }
-            } catch {
-                await MainActor.run {
-                    alertMessage = "Erro ao carregar vídeo:\n\(error.localizedDescription)"
-                    showAlert = true
+                case .failure(let error):
+                    self.alertMessage = "Erro ao carregar: \(error.localizedDescription)"
+                    self.showAlert = true
                 }
             }
         }
