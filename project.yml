@@ -27,6 +27,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.vcam.controller
         PRODUCT_NAME: VcamController
         INFOPLIST_FILE: VcamController/Info.plist
+        GENERATE_INFOPLIST_FILE: "NO"
         CODE_SIGN_IDENTITY: ""
         CODE_SIGNING_REQUIRED: "NO"
         CODE_SIGNING_ALLOWED: "NO"
