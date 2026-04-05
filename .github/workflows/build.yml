@@ -1,0 +1,101 @@
+name: Build VcamController IPA
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build IPA (unsigned / TrollStore)
+    runs-on: macos-14        # Xcode 15 + Apple Silicon
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── 2. Select Xcode ──────────────────────────────────────────────
+      - name: Select Xcode 15
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+
+      # ── 3. Install XcodeGen ──────────────────────────────────────────
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      # ── 4. Generate .xcodeproj ───────────────────────────────────────
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      # ── 5. Build (no signing) ────────────────────────────────────────
+      - name: Build app
+        run: |
+          xcodebuild \
+            -project VcamController.xcodeproj \
+            -scheme VcamController \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            ONLY_ACTIVE_ARCH=NO \
+            BUILD_DIR="$PWD/build" \
+            build
+
+      # ── 6. Locate .app ───────────────────────────────────────────────
+      - name: Find .app bundle
+        id: find_app
+        run: |
+          APP=$(find build -name "*.app" -maxdepth 5 | head -1)
+          echo "APP_PATH=$APP" >> $GITHUB_ENV
+          echo "Found: $APP"
+
+      # ── 7. Fake-sign with ldid (TrollStore compatible) ───────────────
+      - name: Install ldid
+        run: brew install ldid
+
+      - name: Fake-sign with entitlements
+        run: |
+          ldid -SVcamController/VcamController.entitlements \
+            "$APP_PATH/VcamController"
+
+      # ── 8. Package as .ipa ───────────────────────────────────────────
+      - name: Package IPA
+        run: |
+          mkdir -p Payload
+          cp -r "$APP_PATH" Payload/
+          zip -r VcamController.ipa Payload
+          echo "IPA created: $(du -sh VcamController.ipa)"
+
+      # ── 9. Upload artifact ───────────────────────────────────────────
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: VcamController-IPA
+          path: VcamController.ipa
+          retention-days: 30
+
+      # ── 10. Create GitHub Release (on push to main) ──────────────────
+      - name: Create Release
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v1.0.${{ github.run_number }}"
+          name: "VCam Controller v1.0.${{ github.run_number }}"
+          body: |
+            ## VCam Rootless Controller
+
+            **Instale via TrollStore** — arraste o `.ipa` para o TrollStore ou use o instalador.
+
+            ### Como usar:
+            1. Abra o app
+            2. Tap **Select** → escolha o vídeo da galeria
+            3. Tap **Preview** para visualizar
+            4. Tap **Apply** para ativar na câmera virtual
+            5. Vá em **Settings** para ativar modo espelho ou limpar
+          files: VcamController.ipa
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
