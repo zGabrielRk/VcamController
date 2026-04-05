@@ -1,6 +1,7 @@
 import SwiftUI
 import PhotosUI
 import AVKit
+import UniformTypeIdentifiers
 
 struct HomeView: View {
     @StateObject private var vcam = VcamManager.shared
@@ -187,23 +188,54 @@ struct HomeView: View {
     private func loadVideo(from item: PhotosPickerItem) {
         isLoading = true
         pendingThumbnail = nil
+        pendingURL = nil
 
-        item.loadTransferable(type: VideoTransferable.self) { result in
+        guard let provider = item.itemProvider else {
+            isLoading = false
+            pickerItems = []
+            alertMessage = "Não foi possível acessar o vídeo."
+            showAlert = true
+            return
+        }
+
+        // "public.movie" cobre .mov, .mp4 e qualquer vídeo da galeria
+        let typeId = provider.hasItemConformingToTypeIdentifier(UTType.movie.identifier)
+            ? UTType.movie.identifier
+            : "public.audiovisual-content"
+
+        provider.loadFileRepresentation(forTypeIdentifier: typeId) { tempURL, error in
+            // ⚠️ tempURL é válida APENAS dentro deste bloco — copiar sincronamente
+            var stableURL: URL? = nil
+            var copyError: Error? = nil
+
+            if let src = tempURL {
+                do {
+                    let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                    let dest = docs.appendingPathComponent("vcam_pending.mov")
+                    try? FileManager.default.removeItem(at: dest)
+                    try FileManager.default.copyItem(at: src, to: dest)
+                    stableURL = dest
+                } catch {
+                    copyError = error
+                }
+            }
+
             DispatchQueue.main.async {
                 isLoading = false
-                switch result {
-                case .success(let video):
-                    if let video = video {
-                        pendingURL = video.url
-                        vcam.setPendingThumbnail(from: video.url)
-                        // Capture thumbnail locally for "pending" display
-                        generateLocalThumb(from: video.url)
-                    }
-                case .failure(let error):
-                    alertMessage = "Erro ao carregar: \(error.localizedDescription)"
-                    showAlert = true
-                }
                 pickerItems = []
+
+                if let err = error ?? copyError {
+                    alertMessage = "Erro ao carregar vídeo:\n\(err.localizedDescription)"
+                    showAlert = true
+                    return
+                }
+                guard let url = stableURL else {
+                    alertMessage = "Vídeo inválido ou formato não suportado."
+                    showAlert = true
+                    return
+                }
+                pendingURL = url
+                generateLocalThumb(from: url)
             }
         }
     }

@@ -27,8 +27,16 @@ class VcamManager: ObservableObject {
         }
     }
 
-    /// Copy a video from a temp/picker URL into the VCam slot
+    /// Copy a video from a stable local URL into the VCam slot
     func setVideo(from sourceURL: URL) throws {
+        guard fm.fileExists(atPath: sourceURL.path) else {
+            throw NSError(
+                domain: "VCamManager",
+                code: 2,
+                userInfo: [NSLocalizedDescriptionKey:
+                    "Arquivo de origem não encontrado: \(sourceURL.lastPathComponent)\nTente selecionar o vídeo novamente."]
+            )
+        }
         let dir = (tempMovPath as NSString).deletingLastPathComponent
         try? fm.createDirectory(atPath: dir, withIntermediateDirectories: true, attributes: nil)
         try? fm.removeItem(atPath: tempMovPath)
