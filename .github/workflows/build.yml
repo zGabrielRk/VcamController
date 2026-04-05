@@ -50,6 +50,10 @@ jobs:
         id: find_app
         run: |
           APP=$(find build -name "*.app" -maxdepth 5 | head -1)
+          if [ -z "$APP" ]; then
+            echo "Error: .app bundle not found!"
+            exit 1
+          fi
           echo "APP_PATH=$APP" >> $GITHUB_ENV
           echo "Found: $APP"
 
@@ -59,6 +63,10 @@ jobs:
 
       - name: Fake-sign with entitlements
         run: |
+          if [ ! -f "$APP_PATH/VcamController" ]; then
+              echo "Error: Executable VcamController not found in $APP_PATH"
+              exit 1
+          fi
           ldid -SVcamController/VcamController.entitlements \
             "$APP_PATH/VcamController"
 
@@ -66,7 +74,7 @@ jobs:
       - name: Package IPA
         run: |
           mkdir -p Payload
-          cp -r "$APP_PATH" Payload/
+          cp -R "$APP_PATH" Payload/
           zip -r VcamController.ipa Payload
           echo "IPA created: $(du -sh VcamController.ipa)"
 
