@@ -3,80 +3,59 @@ name: Build VcamController IPA
 on:
   push:
     branches: [main, master]
-  pull_request:
-    branches: [main, master]
   workflow_dispatch:
 
 jobs:
   build:
     name: Build IPA (unsigned / TrollStore)
-    runs-on: macos-15
+    runs-on: macos-14
     permissions:
       contents: write
 
     steps:
-      # ── 1. Checkout ──────────────────────────────────────────────────
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ── 3. Install XcodeGen ──────────────────────────────────────────
-      - name: Install XcodeGen
-        run: brew install xcodegen
+      - name: Gerar projeto Xcode
+        run: python3 generate_xcodeproj.py
 
-      # ── 4. Generate .xcodeproj ───────────────────────────────────────
-      - name: Generate Xcode project
-        run: xcodegen generate
-
-      # ── 5. Build (no signing) ────────────────────────────────────────
-      - name: Build app
+      - name: Compilar app
         run: |
           xcodebuild \
             -project VcamController.xcodeproj \
             -scheme VcamController \
             -configuration Release \
             -sdk iphoneos \
-            -destination "generic/platform=iOS" \
+            -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            ONLY_ACTIVE_ARCH=NO \
-            BUILD_DIR="$PWD/build" \
-            build
+            PROVISIONING_PROFILE=""
 
-      # ── 6. Locate .app ───────────────────────────────────────────────
-      - name: Find .app bundle
+      - name: Localizar .app
         id: find_app
         run: |
-          APP=$(find build -name "*.app" -maxdepth 5 | head -1)
+          APP=$(find build -name "VcamController.app" -type d | head -1)
           if [ -z "$APP" ]; then
-            echo "Error: .app bundle not found!"
+            echo "Erro: VcamController.app não encontrado!"
+            find build -name "*.app" -type d
             exit 1
           fi
           echo "APP_PATH=$APP" >> $GITHUB_ENV
-          echo "Found: $APP"
+          echo "Encontrado: $APP"
 
-      # ── 7. Fake-sign with ldid (TrollStore compatible) ───────────────
-      - name: Install ldid
-        run: brew install ldid
-
-      - name: Fake-sign with entitlements
+      - name: Fake-sign com ldid
         run: |
-          if [ ! -f "$APP_PATH/VcamController" ]; then
-              echo "Error: Executable VcamController not found in $APP_PATH"
-              exit 1
-          fi
-          ldid -SVcamController/VcamController.entitlements \
-            "$APP_PATH/VcamController"
+          brew install ldid
+          ldid -SVcamController/VcamController.entitlements "$APP_PATH/VcamController"
 
-      # ── 8. Package as .ipa ───────────────────────────────────────────
-      - name: Package IPA
+      - name: Empacotar IPA
         run: |
           mkdir -p Payload
-          cp -R "$APP_PATH" Payload/
+          cp -r "$APP_PATH" Payload/VcamController.app
           zip -r VcamController.ipa Payload
-          echo "IPA created: $(du -sh VcamController.ipa)"
+          rm -rf Payload
+          echo "IPA: $(du -sh VcamController.ipa)"
 
-      # ── 9. Upload artifact ───────────────────────────────────────────
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
@@ -84,8 +63,7 @@ jobs:
           path: VcamController.ipa
           retention-days: 30
 
-      # ── 10. Create GitHub Release (on push to main) ──────────────────
-      - name: Create Release
+      - name: Criar Release
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v2
         with:
@@ -94,14 +72,14 @@ jobs:
           body: |
             ## VCam Rootless Controller
 
-            **Instale via TrollStore** — arraste o `.ipa` para o TrollStore ou use o instalador.
+            Instale via **TrollStore** — arraste o `.ipa` para o TrollStore.
 
             ### Como usar:
             1. Abra o app
-            2. Tap **Select** → escolha o vídeo da galeria
+            2. Tap **Select** → escolha o vídeo
             3. Tap **Preview** para visualizar
-            4. Tap **Apply** para ativar na câmera virtual
-            5. Vá em **Settings** para ativar modo espelho ou limpar
+            4. Tap **Apply** para ativar
+            5. **Settings** → espelho / desativar
           files: VcamController.ipa
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

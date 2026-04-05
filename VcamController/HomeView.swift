@@ -34,12 +34,12 @@ struct HomeView: View {
                 RoundedRectangle(cornerRadius: 14)
                     .fill(bgCard)
 
-                if isLoading {
+                if isLoading || vcam.isFixing {
                     VStack(spacing: 12) {
                         ProgressView()
                             .tint(purple)
                             .scaleEffect(1.4)
-                        Text("Carregando...")
+                        Text(vcam.isFixing ? "Corrigindo orientação..." : "Carregando...")
                             .foregroundColor(.gray)
                             .font(.system(size: 14))
                     }
@@ -111,7 +111,7 @@ struct HomeView: View {
                     ) {
                         PurpleButton(title: "Select")
                     }
-                    .onChange(of: pickerItems) { _, newItems in
+                    .onChange(of: pickerItems) { newItems in
                         if let item = newItems.first { loadVideo(from: item) }
                     }
 
