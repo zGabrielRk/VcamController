@@ -53,8 +53,9 @@ struct VideoPicker: UIViewControllerRepresentable {
                     DispatchQueue.main.async { self.onError("Não foi possível carregar o vídeo.") }
                     return
                 }
-                // Copia para /tmp enquanto url ainda é válida
-                let dest = URL(fileURLWithPath: "/tmp/vcam_pending.mov")
+                // Copia para o temp dir do app (sempre acessível, igual ao VCamAppIOS)
+                let dest = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("vcam_pending.mov")
                 do {
                     try? FileManager.default.removeItem(at: dest)
                     try FileManager.default.copyItem(at: url, to: dest)
