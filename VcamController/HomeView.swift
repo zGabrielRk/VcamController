@@ -1,27 +1,18 @@
 import SwiftUI
-import PhotosUI
 import AVKit
 
 struct HomeView: View {
     @StateObject private var vcam = VcamManager.shared
 
-    // PHPicker state
-    @State private var pickerItems: [PhotosPickerItem] = []
-    // Pending (not yet applied) video
+    @State private var showPicker      = false
     @State private var pendingURL: URL? = nil
     @State private var pendingThumbnail: UIImage? = nil
-
-    // Preview sheet
-    @State private var showPreview = false
+    @State private var showPreview     = false
     @State private var previewURL: URL? = nil
-
-    // Alert
-    @State private var showAlert = false
-    @State private var alertMessage = ""
-
-    // Loading
-    @State private var isLoading = false
-    @State private var isApplying = false
+    @State private var showAlert       = false
+    @State private var alertMessage    = ""
+    @State private var isLoading       = false
+    @State private var isApplying      = false
 
     private let purple = Color(hex: "BF82F6")
     private let bgCard = Color(hex: "1E1E21")
@@ -29,19 +20,15 @@ struct HomeView: View {
     var body: some View {
         VStack(spacing: 12) {
 
-            // ── Video Preview Card ──────────────────────────────────────
+            // ── Preview Card ────────────────────────────────────────────
             ZStack {
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(bgCard)
+                RoundedRectangle(cornerRadius: 14).fill(bgCard)
 
                 if isLoading || vcam.isFixing {
                     VStack(spacing: 12) {
-                        ProgressView()
-                            .tint(purple)
-                            .scaleEffect(1.4)
+                        ProgressView().tint(purple).scaleEffect(1.4)
                         Text(vcam.isFixing ? "Corrigindo orientação..." : "Carregando...")
-                            .foregroundColor(.gray)
-                            .font(.system(size: 14))
+                            .foregroundColor(.gray).font(.system(size: 14))
                     }
                 } else if let thumb = pendingThumbnail ?? vcam.videoThumbnail {
                     Image(uiImage: thumb)
@@ -59,40 +46,17 @@ struct HomeView: View {
                     }
                 }
 
-                // "ATIVO" badge when VCam is active
-                if vcam.isEnabled && pendingURL == nil {
-                    VStack {
-                        HStack {
-                            Spacer()
-                            Text("ATIVO")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color.green.opacity(0.8))
-                                .cornerRadius(6)
-                                .padding(10)
-                        }
+                // Badges
+                VStack {
+                    HStack {
                         Spacer()
-                    }
-                }
-
-                // "PENDENTE" badge when video selected but not applied
-                if pendingURL != nil {
-                    VStack {
-                        HStack {
-                            Spacer()
-                            Text("PENDENTE")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(purple.opacity(0.85))
-                                .cornerRadius(6)
-                                .padding(10)
+                        if vcam.isEnabled && pendingURL == nil {
+                            Badge(text: "ATIVO", color: .green)
+                        } else if pendingURL != nil {
+                            Badge(text: "PENDENTE", color: purple)
                         }
-                        Spacer()
                     }
+                    Spacer()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -102,19 +66,13 @@ struct HomeView: View {
             // ── Buttons ─────────────────────────────────────────────────
             VStack(spacing: 10) {
 
-                // Select | Preview
                 HStack(spacing: 10) {
-                    PhotosPicker(
-                        selection: $pickerItems,
-                        maxSelectionCount: 1,
-                        matching: .videos
-                    ) {
+                    // Select — abre PHPickerViewController (suporta todos formatos)
+                    Button { showPicker = true } label: {
                         PurpleButton(title: "Select")
                     }
-                    .onChange(of: pickerItems) { newItems in
-                        if let item = newItems.first { loadVideo(from: item) }
-                    }
 
+                    // Preview
                     Button { openPreview() } label: {
                         PurpleButton(title: "Preview")
                     }
@@ -125,8 +83,7 @@ struct HomeView: View {
                 // Apply
                 Button { applyVideo() } label: {
                     ZStack {
-                        PurpleButton(title: isApplying ? "Aplicando..." : "Apply")
-                            .opacity(isApplying ? 0 : 1)
+                        PurpleButton(title: "Apply").opacity(isApplying ? 0 : 1)
                         if isApplying {
                             HStack(spacing: 8) {
                                 ProgressView().tint(.white)
@@ -134,33 +91,26 @@ struct HomeView: View {
                                     .font(.system(size: 18, weight: .bold))
                                     .foregroundColor(.white)
                             }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 54)
-                            .background(purple)
-                            .cornerRadius(12)
+                            .frame(maxWidth: .infinity).frame(height: 54)
+                            .background(purple).cornerRadius(12)
                         }
                     }
                 }
                 .disabled(isApplying || pendingURL == nil)
                 .opacity((pendingURL != nil && !isApplying) ? 1 : 0.45)
 
-                // Disable VCam — aparece só quando estiver ativo
+                // Disable — só quando ativo
                 if vcam.isEnabled {
                     Button { disableVcam() } label: {
                         HStack(spacing: 8) {
                             Image(systemName: "video.slash.fill")
-                            Text("Disable VCam")
-                                .font(.system(size: 18, weight: .bold))
+                            Text("Disable VCam").font(.system(size: 18, weight: .bold))
                         }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 54)
+                        .frame(maxWidth: .infinity).frame(height: 54)
                         .background(Color.red.opacity(0.18))
-                        .foregroundColor(.red)
-                        .cornerRadius(12)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.red.opacity(0.35), lineWidth: 1)
-                        )
+                        .foregroundColor(.red).cornerRadius(12)
+                        .overlay(RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.red.opacity(0.35), lineWidth: 1))
                     }
                 }
             }
@@ -168,10 +118,25 @@ struct HomeView: View {
             .padding(.bottom, 8)
         }
         .background(Color(hex: "111113"))
+        // PHPickerViewController — suporta .mov, .mp4, HEVC, todos os formatos
+        .sheet(isPresented: $showPicker) {
+            VideoPicker(
+                onPicked: { url in
+                    isLoading = false
+                    pendingURL = url
+                    generateLocalThumb(from: url)
+                },
+                onError: { msg in
+                    isLoading = false
+                    alertMessage = "Erro: \(msg)"
+                    showAlert = true
+                }
+            )
+            .onAppear { isLoading = true }
+        }
         .sheet(isPresented: $showPreview) {
             if let url = previewURL {
-                VideoPlayer(player: AVPlayer(url: url))
-                    .ignoresSafeArea()
+                VideoPlayer(player: AVPlayer(url: url)).ignoresSafeArea()
             }
         }
         .alert("VCam", isPresented: $showAlert) {
@@ -184,43 +149,14 @@ struct HomeView: View {
 
     // MARK: - Actions
 
-    private func loadVideo(from item: PhotosPickerItem) {
-        isLoading = true
-        pendingThumbnail = nil
-        pendingURL = nil
-
-        // Callback igual ao app que funcionou — /tmp persiste durante a sessão
-        item.loadTransferable(type: VideoTransferable.self) { result in
-            DispatchQueue.main.async {
-                self.isLoading = false
-                self.pickerItems = []
-                switch result {
-                case .success(let video):
-                    if let url = video?.url {
-                        self.pendingURL = url
-                        self.generateLocalThumb(from: url)
-                    } else {
-                        self.alertMessage = "Vídeo inválido ou formato não suportado."
-                        self.showAlert = true
-                    }
-                case .failure(let error):
-                    self.alertMessage = "Erro ao carregar: \(error.localizedDescription)"
-                    self.showAlert = true
-                }
-            }
-        }
-    }
-
     private func generateLocalThumb(from url: URL) {
         DispatchQueue.global(qos: .userInitiated).async {
             let asset = AVAsset(url: url)
-            let gen = AVAssetImageGenerator(asset: asset)
+            let gen   = AVAssetImageGenerator(asset: asset)
             gen.appliesPreferredTrackTransform = true
             gen.maximumSize = CGSize(width: 800, height: 800)
             if let cg = try? gen.copyCGImage(at: .zero, actualTime: nil) {
-                DispatchQueue.main.async {
-                    pendingThumbnail = UIImage(cgImage: cg)
-                }
+                DispatchQueue.main.async { pendingThumbnail = UIImage(cgImage: cg) }
             }
         }
     }
@@ -244,13 +180,11 @@ struct HomeView: View {
         DispatchQueue.global(qos: .userInitiated).async {
             do {
                 try vcam.setVideo(from: url)
-                // Clean up temp file
-                try? FileManager.default.removeItem(at: url)
                 DispatchQueue.main.async {
                     isApplying = false
                     pendingURL = nil
                     pendingThumbnail = nil
-                    alertMessage = "✅ Vídeo aplicado! Abra qualquer app de câmera para testar."
+                    alertMessage = "✅ Vídeo aplicado! Abra qualquer app de câmera."
                     showAlert = true
                 }
             } catch {
@@ -264,18 +198,28 @@ struct HomeView: View {
     }
 }
 
-// MARK: - Reusable purple button shape
+// MARK: - Helpers
+
+struct Badge: View {
+    let text: String
+    let color: Color
+    var body: some View {
+        Text(text)
+            .font(.system(size: 10, weight: .bold))
+            .foregroundColor(.white)
+            .padding(.horizontal, 8).padding(.vertical, 4)
+            .background(color.opacity(0.85))
+            .cornerRadius(6).padding(10)
+    }
+}
+
 struct PurpleButton: View {
     let title: String
     private let purple = Color(hex: "BF82F6")
-
     var body: some View {
         Text(title)
             .font(.system(size: 18, weight: .bold))
-            .frame(maxWidth: .infinity)
-            .frame(height: 54)
-            .background(purple)
-            .foregroundColor(.white)
-            .cornerRadius(12)
+            .frame(maxWidth: .infinity).frame(height: 54)
+            .background(purple).foregroundColor(.white).cornerRadius(12)
     }
 }

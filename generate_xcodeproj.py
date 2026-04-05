@@ -31,6 +31,7 @@ swift_files = [
     "VcamController/HomeView.swift",
     "VcamController/SettingsView.swift",
     "VcamController/VcamManager.swift",
+    "VcamController/VideoPicker.swift",
     "VcamController/VideoTransferable.swift",
 ]
 
