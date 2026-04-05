@@ -43,11 +43,6 @@ jobs:
           echo "APP_PATH=$APP" >> $GITHUB_ENV
           echo "Encontrado: $APP"
 
-      - name: Fake-sign com ldid
-        run: |
-          brew install ldid
-          ldid -SVcamController/VcamController.entitlements "$APP_PATH/VcamController"
-
       - name: Empacotar IPA
         run: |
           mkdir -p Payload

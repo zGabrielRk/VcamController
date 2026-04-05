@@ -34,8 +34,7 @@ swift_files = [
     "VcamController/VideoTransferable.swift",
 ]
 
-plist_file       = "VcamController/Info.plist"
-entitlements_file = "VcamController/VcamController.entitlements"
+plist_file = "VcamController/Info.plist"
 
 file_ids       = {f: make_id() for f in swift_files}
 plist_id       = make_id()
@@ -201,7 +200,6 @@ pbxproj = f"""// !$*UTF8*$!
 \t\t\tisa = XCBuildConfiguration;
 \t\t\tbuildSettings = {{
 \t\t\t\tCODE_SIGNING_ALLOWED = NO;
-\t\t\t\tCODE_SIGN_ENTITLEMENTS = "{entitlements_file}";
 \t\t\t\tCODE_SIGN_IDENTITY = "";
 \t\t\t\tCURRENT_PROJECT_VERSION = 1;
 \t\t\t\tGENERATE_INFOPLIST_FILE = NO;
@@ -220,7 +218,6 @@ pbxproj = f"""// !$*UTF8*$!
 \t\t\tisa = XCBuildConfiguration;
 \t\t\tbuildSettings = {{
 \t\t\t\tCODE_SIGNING_ALLOWED = NO;
-\t\t\t\tCODE_SIGN_ENTITLEMENTS = "{entitlements_file}";
 \t\t\t\tCODE_SIGN_IDENTITY = "";
 \t\t\t\tCURRENT_PROJECT_VERSION = 1;
 \t\t\t\tGENERATE_INFOPLIST_FILE = NO;
