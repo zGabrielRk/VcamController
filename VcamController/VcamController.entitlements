@@ -2,14 +2,9 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- TrollStore / Sideload entitlements for full filesystem access -->
+	<!-- no-sandbox: acesso ao filesystem fora do container (necessário para /var/jb/) -->
 	<key>com.apple.private.security.no-sandbox</key>
 	<true/>
-	<key>com.apple.private.security.no-container</key>
-	<true/>
-	<key>platform-application</key>
-	<true/>
-	<key>get-task-allow</key>
-	<true/>
+	<!-- no-container e platform-application removidos: causam crash no launch -->
 </dict>
 </plist>

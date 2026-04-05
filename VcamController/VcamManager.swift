@@ -15,7 +15,10 @@ class VcamManager: ObservableObject {
 
     private let fm = FileManager.default
 
-    private init() { refresh() }
+    private init() {
+        // Adiado para a main thread — evita crash se o sandbox ainda não estiver pronto
+        DispatchQueue.main.async { self.refresh() }
+    }
 
     func refresh() {
         isEnabled = fm.fileExists(atPath: tempMovPath)
