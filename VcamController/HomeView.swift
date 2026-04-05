@@ -1,7 +1,6 @@
 import SwiftUI
 import PhotosUI
 import AVKit
-import UniformTypeIdentifiers
 
 struct HomeView: View {
     @StateObject private var vcam = VcamManager.shared
@@ -112,8 +111,8 @@ struct HomeView: View {
                     ) {
                         PurpleButton(title: "Select")
                     }
-                    .onChange(of: pickerItems) { items in
-                        if let item = items.first { loadVideo(from: item) }
+                    .onChange(of: pickerItems) { _, newItems in
+                        if let item = newItems.first { loadVideo(from: item) }
                     }
 
                     Button { openPreview() } label: {
@@ -190,52 +189,32 @@ struct HomeView: View {
         pendingThumbnail = nil
         pendingURL = nil
 
-        guard let provider = item.itemProvider else {
-            isLoading = false
-            pickerItems = []
-            alertMessage = "Não foi possível acessar o vídeo."
-            showAlert = true
-            return
-        }
-
-        // "public.movie" cobre .mov, .mp4 e qualquer vídeo da galeria
-        let typeId = provider.hasItemConformingToTypeIdentifier(UTType.movie.identifier)
-            ? UTType.movie.identifier
-            : "public.audiovisual-content"
-
-        provider.loadFileRepresentation(forTypeIdentifier: typeId) { tempURL, error in
-            // ⚠️ tempURL é válida APENAS dentro deste bloco — copiar sincronamente
-            var stableURL: URL? = nil
-            var copyError: Error? = nil
-
-            if let src = tempURL {
-                do {
-                    let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-                    let dest = docs.appendingPathComponent("vcam_pending.mov")
-                    try? FileManager.default.removeItem(at: dest)
-                    try FileManager.default.copyItem(at: src, to: dest)
-                    stableURL = dest
-                } catch {
-                    copyError = error
+        // VideoTransferable.importing copia o arquivo para documentDirectory
+        // antes de retornar — o URL retornado é estável e persiste até o Apply
+        Task {
+            defer {
+                Task { @MainActor in
+                    isLoading = false
+                    pickerItems = []
                 }
             }
-
-            DispatchQueue.main.async {
-                isLoading = false
-                pickerItems = []
-
-                if let err = error ?? copyError {
-                    alertMessage = "Erro ao carregar vídeo:\n\(err.localizedDescription)"
-                    showAlert = true
+            do {
+                guard let video = try await item.loadTransferable(type: VideoTransferable.self) else {
+                    await MainActor.run {
+                        alertMessage = "Vídeo inválido ou formato não suportado."
+                        showAlert = true
+                    }
                     return
                 }
-                guard let url = stableURL else {
-                    alertMessage = "Vídeo inválido ou formato não suportado."
-                    showAlert = true
-                    return
+                await MainActor.run {
+                    pendingURL = video.url
+                    generateLocalThumb(from: video.url)
                 }
-                pendingURL = url
-                generateLocalThumb(from: url)
+            } catch {
+                await MainActor.run {
+                    alertMessage = "Erro ao carregar vídeo:\n\(error.localizedDescription)"
+                    showAlert = true
+                }
             }
         }
     }
