@@ -40,6 +40,7 @@ jobs:
         run: |
           xcrun -sdk iphoneos clang \
             -arch arm64 \
+            -target arm64-apple-ios16.0 \
             -fsyntax-only \
             -fobjc-arc \
             -Wno-deprecated-declarations \
@@ -49,23 +50,23 @@ jobs:
             -framework CoreVideo \
             -framework CoreImage \
             -framework UIKit \
-            -miphoneos-version-min=16.0 \
             VcamTweak/VcamTweak.m 2>&1 || true
 
       - name: Compile VcamTweak dylib
         run: |
           xcrun -sdk iphoneos clang \
             -arch arm64 \
+            -target arm64-apple-ios16.0 \
             -dynamiclib \
             -fobjc-arc \
             -Wno-deprecated-declarations \
+            -Wl,-undefined,dynamic_lookup \
             -framework Foundation \
             -framework AVFoundation \
             -framework CoreMedia \
             -framework CoreVideo \
             -framework CoreImage \
             -framework UIKit \
-            -miphoneos-version-min=16.0 \
             -install_name /var/jb/Library/MobileSubstrate/DynamicLibraries/VcamTweak.dylib \
             -o VcamTweak.dylib \
             VcamTweak/VcamTweak.m
