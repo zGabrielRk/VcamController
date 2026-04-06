@@ -1,15 +1,14 @@
 import SwiftUI
 import AVKit
-import PhotosUI
 
 struct HomeView: View {
     @StateObject private var vcam = VcamManager.shared
 
-    @State private var selectedItem: PhotosPickerItem? = nil
-    @State private var showPreview   = false
-    @State private var showAlert     = false
-    @State private var alertMessage  = ""
-    @State private var isLoading     = false
+    @State private var showPicker   = false
+    @State private var showPreview  = false
+    @State private var showAlert    = false
+    @State private var alertMessage = ""
+    @State private var isLoading    = false
 
     private let purple = Color(hex: "BF82F6")
     private let bgCard = Color(hex: "1E1E21")
@@ -17,7 +16,7 @@ struct HomeView: View {
     var body: some View {
         VStack(spacing: 12) {
 
-            // ── Preview Card ────────────────────────────────────────────
+            // ── Preview Card ─────────────────────────────────────────
             ZStack {
                 RoundedRectangle(cornerRadius: 14).fill(bgCard)
 
@@ -43,7 +42,6 @@ struct HomeView: View {
                     }
                 }
 
-                // Badge ATIVO
                 if vcam.isEnabled && !isLoading {
                     VStack {
                         HStack {
@@ -58,24 +56,14 @@ struct HomeView: View {
             .padding(.horizontal, 16)
             .padding(.top, 16)
 
-            // ── Buttons ─────────────────────────────────────────────────
+            // ── Buttons ───────────────────────────────────────────────
             VStack(spacing: 10) {
 
                 HStack(spacing: 10) {
-                    // Select — aplica direto ao selecionar
-                    PhotosPicker(
-                        selection: $selectedItem,
-                        matching: .videos,
-                        photoLibrary: .shared()
-                    ) {
+                    Button { showPicker = true } label: {
                         PurpleButton(title: "Select")
                     }
-                    .onChange(of: selectedItem) { item in
-                        guard let item else { return }
-                        applyVideo(from: item)
-                    }
 
-                    // Preview — só quando ativo
                     Button { openPreview() } label: {
                         PurpleButton(title: "Preview")
                     }
@@ -83,7 +71,6 @@ struct HomeView: View {
                     .disabled(!vcam.isEnabled)
                 }
 
-                // Disable — só quando ativo
                 if vcam.isEnabled {
                     Button { disableVcam() } label: {
                         HStack(spacing: 8) {
@@ -102,6 +89,30 @@ struct HomeView: View {
             .padding(.bottom, 8)
         }
         .background(Color(hex: "111113"))
+        .sheet(isPresented: $showPicker) {
+            VideoPicker(
+                onPicked: { url in
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        do {
+                            try vcam.installVideo(from: url)
+                            DispatchQueue.main.async { isLoading = false }
+                        } catch {
+                            DispatchQueue.main.async {
+                                isLoading = false
+                                alertMessage = "Erro ao salvar: \(error.localizedDescription)"
+                                showAlert = true
+                            }
+                        }
+                    }
+                },
+                onError: { msg in
+                    isLoading = false
+                    alertMessage = "Erro: \(msg)"
+                    showAlert = true
+                }
+            )
+            .onAppear { isLoading = true }
+        }
         .sheet(isPresented: $showPreview) {
             if vcam.isEnabled {
                 VideoPlayer(player: AVPlayer(url: URL(fileURLWithPath: vcam.tempMovPath)))
@@ -114,45 +125,6 @@ struct HomeView: View {
             Text(alertMessage)
         }
         .onAppear { vcam.refresh() }
-    }
-
-    // MARK: - Actions
-
-    private func applyVideo(from item: PhotosPickerItem) {
-        isLoading = true
-        item.loadTransferable(type: VideoTransferable.self) { result in
-            DispatchQueue.main.async { selectedItem = nil }
-            switch result {
-            case .success(let video):
-                guard let url = video?.url else {
-                    DispatchQueue.main.async {
-                        isLoading = false
-                        alertMessage = "Erro: vídeo inválido."
-                        showAlert = true
-                    }
-                    return
-                }
-                // Copia do temporaryDirectory para temp.mov em background
-                DispatchQueue.global(qos: .userInitiated).async {
-                    do {
-                        try vcam.installVideo(from: url)
-                        DispatchQueue.main.async { isLoading = false }
-                    } catch {
-                        DispatchQueue.main.async {
-                            isLoading = false
-                            alertMessage = "Erro ao salvar: \(error.localizedDescription)"
-                            showAlert = true
-                        }
-                    }
-                }
-            case .failure(let error):
-                DispatchQueue.main.async {
-                    isLoading = false
-                    alertMessage = "Erro: \(error.localizedDescription)"
-                    showAlert = true
-                }
-            }
-        }
     }
 
     private func openPreview() {
