@@ -1,18 +1,19 @@
 import SwiftUI
 import AVKit
+import PhotosUI
 
 struct HomeView: View {
     @StateObject private var vcam = VcamManager.shared
 
-    @State private var showPicker      = false
-    @State private var pendingURL: URL? = nil
-    @State private var pendingThumbnail: UIImage? = nil
-    @State private var showPreview     = false
-    @State private var previewURL: URL? = nil
-    @State private var showAlert       = false
-    @State private var alertMessage    = ""
-    @State private var isLoading       = false
-    @State private var isApplying      = false
+    @State private var selectedItem:    PhotosPickerItem? = nil
+    @State private var pendingURL:      URL?       = nil
+    @State private var pendingThumbnail: UIImage?  = nil
+    @State private var showPreview      = false
+    @State private var previewURL:      URL?       = nil
+    @State private var showAlert        = false
+    @State private var alertMessage     = ""
+    @State private var isLoading        = false
+    @State private var isApplying       = false
 
     private let purple = Color(hex: "BF82F6")
     private let bgCard = Color(hex: "1E1E21")
@@ -67,10 +68,12 @@ struct HomeView: View {
             VStack(spacing: 10) {
 
                 HStack(spacing: 10) {
-                    // Select — abre PHPickerViewController (suporta todos formatos)
-                    Button { showPicker = true } label: {
-                        PurpleButton(title: "Select")
-                    }
+                    // Select — PhotosPicker nativo (framework gerencia acesso ao arquivo)
+                    VideoPickerButton(selectedItem: $selectedItem, label: "Select")
+                        .onChange(of: selectedItem) { item in
+                            guard let item else { return }
+                            loadVideo(from: item)
+                        }
 
                     // Preview
                     Button { openPreview() } label: {
@@ -118,22 +121,6 @@ struct HomeView: View {
             .padding(.bottom, 8)
         }
         .background(Color(hex: "111113"))
-        // PHPickerViewController — suporta .mov, .mp4, HEVC, todos os formatos
-        .sheet(isPresented: $showPicker) {
-            VideoPicker(
-                onPicked: { url in
-                    isLoading = false
-                    pendingURL = url
-                    generateLocalThumb(from: url)
-                },
-                onError: { msg in
-                    isLoading = false
-                    alertMessage = "Erro: \(msg)"
-                    showAlert = true
-                }
-            )
-            .onAppear { isLoading = true }
-        }
         .sheet(isPresented: $showPreview) {
             if let url = previewURL {
                 VideoPlayer(player: AVPlayer(url: url)).ignoresSafeArea()
@@ -148,6 +135,30 @@ struct HomeView: View {
     }
 
     // MARK: - Actions
+
+    private func loadVideo(from item: PhotosPickerItem) {
+        isLoading = true
+        pendingURL = nil
+        pendingThumbnail = nil
+        item.loadTransferable(type: VideoTransferable.self) { result in
+            DispatchQueue.main.async {
+                isLoading = false
+                switch result {
+                case .success(let video):
+                    if let url = video?.url {
+                        pendingURL = url
+                        generateLocalThumb(from: url)
+                    } else {
+                        alertMessage = "Erro: não foi possível carregar o vídeo."
+                        showAlert = true
+                    }
+                case .failure(let error):
+                    alertMessage = "Erro: \(error.localizedDescription)"
+                    showAlert = true
+                }
+            }
+        }
+    }
 
     private func generateLocalThumb(from url: URL) {
         DispatchQueue.global(qos: .userInitiated).async {
