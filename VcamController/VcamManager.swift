@@ -31,13 +31,23 @@ class VcamManager: ObservableObject {
 
     /// Copia o vídeo para o destino final do VCam (igual ao VCamAppIOS-main original)
     func installVideo(from sourceURL: URL) throws {
+        // Tenta o path original e o path com symlinks resolvidos
+        let resolved = sourceURL.resolvingSymlinksInPath()
+        let urlToUse: URL
+        if fm.fileExists(atPath: sourceURL.path) {
+            urlToUse = sourceURL
+        } else if fm.fileExists(atPath: resolved.path) {
+            urlToUse = resolved
+        } else {
+            throw NSError(domain: "VCam", code: 99, userInfo: [
+                NSLocalizedDescriptionKey: "Arquivo não encontrado.\nOriginal: \(sourceURL.path)\nResolvido: \(resolved.path)"
+            ])
+        }
         let dest = URL(fileURLWithPath: tempMovPath)
-        // Não criar o diretório — ele já existe no jailbreak (criado pelo tweak)
-        // Tentar criar causava permission denied pois /var/jb/var/mobile/ é owned by root
         if fm.fileExists(atPath: tempMovPath) {
             try fm.removeItem(at: dest)
         }
-        try fm.copyItem(at: sourceURL, to: dest)
+        try fm.copyItem(at: urlToUse, to: dest)
         refresh()
         fixRotationIfNeeded()
     }
