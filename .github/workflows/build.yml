@@ -1,25 +1,24 @@
-name: Build VcamController IPA
+name: Build VCam Rootless (.deb)
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
   build:
-    name: Build IPA (unsigned / TrollStore)
     runs-on: macos-14
     permissions:
       contents: write
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Gerar projeto Xcode
+      # ── 1. Build SwiftUI app ─────────────────────────────────────────────
+      - name: Generate Xcode project
         run: python3 generate_xcodeproj.py
 
-      - name: Compilar app
+      - name: Build app (no signing)
         run: |
           xcodebuild \
             -project VcamController.xcodeproj \
@@ -31,50 +30,80 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             PROVISIONING_PROFILE=""
 
-      - name: Localizar .app
-        id: find_app
+      # ── 2. Compile VcamTweak dylib ───────────────────────────────────────
+      - name: Compile VcamTweak dylib
+        run: |
+          xcrun -sdk iphoneos clang \
+            -arch arm64 \
+            -dynamiclib \
+            -fobjc-arc \
+            -framework Foundation \
+            -framework AVFoundation \
+            -framework CoreMedia \
+            -framework CoreVideo \
+            -framework CoreImage \
+            -framework UIKit \
+            -miphoneos-version-min=16.0 \
+            -install_name /var/jb/Library/MobileSubstrate/DynamicLibraries/VcamTweak.dylib \
+            -o VcamTweak.dylib \
+            VcamTweak/VcamTweak.m
+
+      # ── 3. Assemble .deb package ─────────────────────────────────────────
+      - name: Install dpkg
+        run: brew install dpkg
+
+      - name: Assemble .deb structure
         run: |
           APP=$(find build -name "VcamController.app" -type d | head -1)
           if [ -z "$APP" ]; then
-            echo "Erro: VcamController.app não encontrado!"
-            find build -name "*.app" -type d
-            exit 1
+            echo "ERROR: VcamController.app not found"; exit 1
           fi
-          echo "APP_PATH=$APP" >> $GITHUB_ENV
-          echo "Encontrado: $APP"
 
-      - name: Empacotar IPA
-        run: |
-          mkdir -p Payload
-          cp -r "$APP_PATH" Payload/VcamController.app
-          zip -r VcamController.ipa Payload
-          rm -rf Payload
-          echo "IPA: $(du -sh VcamController.ipa)"
+          DEB=deb_root
 
-      - name: Upload IPA
+          # App → /var/jb/Applications/
+          mkdir -p $DEB/var/jb/Applications
+          cp -r "$APP" $DEB/var/jb/Applications/VcamController.app
+
+          # Tweak dylib + plist → /var/jb/Library/MobileSubstrate/DynamicLibraries/
+          mkdir -p $DEB/var/jb/Library/MobileSubstrate/DynamicLibraries
+          cp VcamTweak.dylib $DEB/var/jb/Library/MobileSubstrate/DynamicLibraries/VcamTweak.dylib
+          cp VcamTweak/VcamTweak.plist $DEB/var/jb/Library/MobileSubstrate/DynamicLibraries/VcamTweak.plist
+
+          # DEBIAN metadata
+          cp -r packaging/DEBIAN $DEB/DEBIAN
+          chmod 755 $DEB/DEBIAN/postinst
+
+          dpkg-deb -b $DEB VcamRootless.deb
+          echo "Package size: $(du -sh VcamRootless.deb)"
+
+      - name: Upload .deb artifact
         uses: actions/upload-artifact@v4
         with:
-          name: VcamController-IPA
-          path: VcamController.ipa
+          name: VcamRootless-deb
+          path: VcamRootless.deb
           retention-days: 30
 
-      - name: Criar Release
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+      - name: Create Release
+        if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: "v1.0.${{ github.run_number }}"
-          name: "VCam Controller v1.0.${{ github.run_number }}"
+          name: "VCam Rootless v1.0.${{ github.run_number }}"
           body: |
-            ## VCam Rootless Controller
+            ## VCam Rootless — Pacote unificado
 
-            Instale via **TrollStore** — arraste o `.ipa` para o TrollStore.
+            Instale via **Sileo / Zebra / Filza** (não precisa de TrollStore).
+
+            ### Contém:
+            - **VcamTweak.dylib** — substitui frames da câmera em qualquer app
+            - **VcamController.app** — interface para selecionar vídeo
 
             ### Como usar:
-            1. Abra o app
-            2. Tap **Select** → escolha o vídeo
-            3. Tap **Preview** para visualizar
-            4. Tap **Apply** para ativar
-            5. **Settings** → espelho / desativar
-          files: VcamController.ipa
+            1. Instale o `.deb`
+            2. O app **VCam** aparece na tela inicial
+            3. Abra, selecione o vídeo
+            4. Abra Camera / FaceTime / qualquer app com câmera
+          files: VcamRootless.deb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

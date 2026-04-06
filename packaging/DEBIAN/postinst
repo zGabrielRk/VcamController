@@ -1,0 +1,18 @@
+#!/bin/bash
+
+# Register app with SpringBoard
+if [ -x /var/jb/usr/bin/uicache ]; then
+    /var/jb/usr/bin/uicache -p /var/jb/Applications/VcamController.app
+elif [ -x /usr/bin/uicache ]; then
+    uicache -p /var/jb/Applications/VcamController.app
+fi
+
+# Set correct permissions on the app
+chmod -R 755 /var/jb/Applications/VcamController.app
+
+# Respring to load the tweak
+if [ -x /var/jb/usr/bin/sbreload ]; then
+    /var/jb/usr/bin/sbreload
+elif [ -x /usr/bin/sbreload ]; then
+    sbreload
+fi

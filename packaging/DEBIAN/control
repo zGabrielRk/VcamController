@@ -1,0 +1,9 @@
+Package: com.gabrielrk.vcamrootless
+Name: VCam Rootless
+Version: 1.0.0
+Architecture: iphoneos-arm64
+Description: Virtual camera for rootless jailbreak. Installs controller app + frame replacement tweak.
+Maintainer: Gabriel
+Author: Gabriel
+Section: Tweaks
+Depends: mobilesubstrate, uikittools
