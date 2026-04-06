@@ -29,12 +29,14 @@ class VcamManager: ObservableObject {
 
     // MARK: - Activate
 
-    /// Copia o vídeo do temp dir para o destino final do VCam
+    /// Copia o vídeo para o destino final do VCam (igual ao VCamAppIOS-main original)
     func installVideo(from sourceURL: URL) throws {
         let dest = URL(fileURLWithPath: tempMovPath)
-        let dir  = (tempMovPath as NSString).deletingLastPathComponent
-        try fm.createDirectory(atPath: dir, withIntermediateDirectories: true, attributes: nil)
-        try? fm.removeItem(at: dest)
+        // Não criar o diretório — ele já existe no jailbreak (criado pelo tweak)
+        // Tentar criar causava permission denied pois /var/jb/var/mobile/ é owned by root
+        if fm.fileExists(atPath: tempMovPath) {
+            try fm.removeItem(at: dest)
+        }
         try fm.copyItem(at: sourceURL, to: dest)
         refresh()
         fixRotationIfNeeded()
