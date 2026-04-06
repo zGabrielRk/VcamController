@@ -45,23 +45,20 @@ struct VideoPicker: UIViewControllerRepresentable {
                 return
             }
 
-            // Copy to vcam dir (guaranteed writable, same dir as temp.mov)
+            // ⚠️ sourceURL só é válida AQUI — copiar sincronamente antes de retornar
             let vcamDir = "/var/jb/var/mobile/Library"
             let dest    = URL(fileURLWithPath: "\(vcamDir)/vcam_staging.mov")
-
-            DispatchQueue.global(qos: .userInitiated).async {
-                do {
-                    try? FileManager.default.createDirectory(
-                        atPath: vcamDir,
-                        withIntermediateDirectories: true,
-                        attributes: nil
-                    )
-                    try? FileManager.default.removeItem(at: dest)
-                    try FileManager.default.copyItem(at: sourceURL, to: dest)
-                    DispatchQueue.main.async { self.onPicked(dest) }
-                } catch {
-                    DispatchQueue.main.async { self.onError(error.localizedDescription) }
-                }
+            do {
+                try? FileManager.default.createDirectory(
+                    atPath: vcamDir,
+                    withIntermediateDirectories: true,
+                    attributes: nil
+                )
+                try? FileManager.default.removeItem(at: dest)
+                try FileManager.default.copyItem(at: sourceURL, to: dest)
+                DispatchQueue.main.async { self.onPicked(dest) }
+            } catch {
+                DispatchQueue.main.async { self.onError(error.localizedDescription) }
             }
         }
     }
