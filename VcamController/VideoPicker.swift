@@ -1,27 +1,29 @@
 import SwiftUI
-import PhotosUI
+import UIKit
+import MobileCoreServices
 
-/// PHPickerViewController via UIKit — funciona com .mov, .mp4, HEVC, todos os formatos
+/// UIImagePickerController — runs in-process, mediaURL is always a direct file URL
 struct VideoPicker: UIViewControllerRepresentable {
     let onPicked: (URL) -> Void
     let onError: (String) -> Void
 
-    func makeUIViewController(context: Context) -> PHPickerViewController {
-        var config = PHPickerConfiguration(photoLibrary: .shared())
-        config.filter = .videos
-        config.selectionLimit = 1
-        let picker = PHPickerViewController(configuration: config)
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = .photoLibrary
+        picker.mediaTypes = [kUTTypeMovie as String]
+        picker.videoQuality = .typeHigh
+        picker.allowsEditing = false
         picker.delegate = context.coordinator
         return picker
     }
 
-    func updateUIViewController(_ uiViewController: PHPickerViewController, context: Context) {}
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
 
     func makeCoordinator() -> Coordinator {
         Coordinator(onPicked: onPicked, onError: onError)
     }
 
-    class Coordinator: NSObject, PHPickerViewControllerDelegate {
+    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
         let onPicked: (URL) -> Void
         let onError: (String) -> Void
 
@@ -30,36 +32,24 @@ struct VideoPicker: UIViewControllerRepresentable {
             self.onError = onError
         }
 
-        func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
             picker.dismiss(animated: true)
-            guard let result = results.first else { return }
+        }
 
-            // "public.movie" cobre .mov, .mp4, HEVC — todos os vídeos da galeria
-            let typeId = "public.movie"
-            guard result.itemProvider.hasItemConformingToTypeIdentifier(typeId) else {
-                DispatchQueue.main.async {
-                    self.onError("Formato de vídeo não suportado.")
-                }
+        func imagePickerController(_ picker: UIImagePickerController,
+                                   didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+            picker.dismiss(animated: true)
+
+            guard let sourceURL = info[.mediaURL] as? URL else {
+                DispatchQueue.main.async { self.onError("Não foi possível obter o vídeo.") }
                 return
             }
 
-            result.itemProvider.loadFileRepresentation(forTypeIdentifier: typeId) { url, error in
-                // ⚠️ url só é válida AQUI — copiar sincronamente antes de retornar
-                if let error = error {
-                    DispatchQueue.main.async { self.onError(error.localizedDescription) }
-                    return
-                }
-                guard let url = url else {
-                    DispatchQueue.main.async { self.onError("Não foi possível carregar o vídeo.") }
-                    return
-                }
-                // Alguns sistemas fornecem URL com security scope — precisamos abrir antes de copiar
-                let accessed = url.startAccessingSecurityScopedResource()
-                defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+            // Copy to vcam dir (guaranteed writable, same dir as temp.mov)
+            let vcamDir = "/var/jb/var/mobile/Library"
+            let dest    = URL(fileURLWithPath: "\(vcamDir)/vcam_staging.mov")
 
-                // Copia direto para o diretório do vcam (sabemos que temos acesso)
-                let vcamDir = "/var/jb/var/mobile/Library"
-                let dest    = URL(fileURLWithPath: "\(vcamDir)/vcam_staging.mov")
+            DispatchQueue.global(qos: .userInitiated).async {
                 do {
                     try? FileManager.default.createDirectory(
                         atPath: vcamDir,
@@ -67,7 +57,7 @@ struct VideoPicker: UIViewControllerRepresentable {
                         attributes: nil
                     )
                     try? FileManager.default.removeItem(at: dest)
-                    try FileManager.default.copyItem(at: url, to: dest)
+                    try FileManager.default.copyItem(at: sourceURL, to: dest)
                     DispatchQueue.main.async { self.onPicked(dest) }
                 } catch {
                     DispatchQueue.main.async { self.onError(error.localizedDescription) }
