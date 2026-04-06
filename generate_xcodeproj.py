@@ -32,7 +32,6 @@ swift_files = [
     "VcamController/SettingsView.swift",
     "VcamController/VcamManager.swift",
     "VcamController/VideoPicker.swift",
-    "VcamController/VideoTransferable.swift",
 ]
 
 plist_file = "VcamController/Info.plist"

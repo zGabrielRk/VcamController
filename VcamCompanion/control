@@ -1,9 +1,0 @@
-Package: com.gabrielrk.vcamcompanion
-Name: VcamCompanion
-Version: 1.0.0
-Architecture: iphoneos-arm64
-Description: Cria o diretório necessário para o VcamController funcionar
-Maintainer: Gabriel
-Author: Gabriel
-Section: Tweaks
-Depends: mobilesubstrate

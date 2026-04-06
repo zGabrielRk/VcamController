@@ -40,7 +40,14 @@ class VcamManager: ObservableObject {
 
         let dest = URL(fileURLWithPath: tempMovPath)
         try? fm.removeItem(at: dest)
-        try fm.copyItem(at: sourceURL, to: dest)
+
+        if fm.fileExists(atPath: dest.path) {
+            // removeItem falhou (permissão) — sobrescreve via dados mapeados
+            let data = try Data(contentsOf: sourceURL, options: .mappedIfSafe)
+            try data.write(to: dest, options: .atomic)
+        } else {
+            try fm.copyItem(at: sourceURL, to: dest)
+        }
         try? fm.removeItem(at: sourceURL)
         refresh()
         fixRotationIfNeeded()
@@ -62,7 +69,8 @@ class VcamManager: ObservableObject {
                     self.isFixing = false
                     if error == nil {
                         try? self.fm.removeItem(at: dest)
-                        try? self.fm.moveItem(at: tmp, to: dest)
+                        try? self.fm.copyItem(at: tmp, to: dest)
+                        try? self.fm.removeItem(at: tmp)
                     }
                     self.refresh()
                 }
