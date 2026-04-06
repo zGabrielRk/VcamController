@@ -32,25 +32,23 @@ class VcamManager: ObservableObject {
     /// Move o vídeo exportado para o destino final do VCam
     func installVideo(from sourceURL: URL) throws {
         // NSTemporaryDirectory() e resolvingSymlinksInPath garantem path canônico
-        let src = sourceURL.resolvingSymlinksInPath()
-        guard fm.fileExists(atPath: src.path) else {
+        // Verifica se o diretório do VCam existe (criado pelo tweak na 1ª sessão de câmera)
+        let vcamDir = (tempMovPath as NSString).deletingLastPathComponent
+        guard fm.fileExists(atPath: vcamDir) else {
+            throw NSError(domain: "VCam", code: 101, userInfo: [
+                NSLocalizedDescriptionKey: "Pasta do VCam não encontrada.\n\nAbra o app Câmera uma vez para o tweak inicializar, depois tente novamente."
+            ])
+        }
+        guard fm.fileExists(atPath: sourceURL.path) else {
             throw NSError(domain: "VCam", code: 99, userInfo: [
-                NSLocalizedDescriptionKey: "Exportado não encontrado:\nsrc=\(src.path)\norig=\(sourceURL.path)"
+                NSLocalizedDescriptionKey: "Arquivo exportado não encontrado:\n\(sourceURL.path)"
             ])
         }
         let dest = URL(fileURLWithPath: tempMovPath)
         try? fm.removeItem(at: dest)
-        do {
-            try fm.moveItem(at: src, to: dest)
-        } catch let moveErr {
-            do {
-                try fm.copyItem(at: src, to: dest)
-            } catch let copyErr {
-                throw NSError(domain: "VCam", code: 100, userInfo: [
-                    NSLocalizedDescriptionKey: "move: \(moveErr.localizedDescription)\ncopy: \(copyErr.localizedDescription)\nsrc=\(src.path)"
-                ])
-            }
-        }
+        // Nunca usar moveItem (deleta source antes de criar dest em cross-device)
+        try fm.copyItem(at: sourceURL, to: dest)
+        try? fm.removeItem(at: sourceURL)
         refresh()
         fixRotationIfNeeded()
     }
