@@ -29,25 +29,24 @@ class VcamManager: ObservableObject {
 
     // MARK: - Activate
 
-    /// Copia o vídeo para o destino final do VCam (igual ao VCamAppIOS-main original)
+    /// Move o vídeo exportado para o destino final do VCam
     func installVideo(from sourceURL: URL) throws {
-        // Tenta o path original e o path com symlinks resolvidos
-        let resolved = sourceURL.resolvingSymlinksInPath()
-        let urlToUse: URL
-        if fm.fileExists(atPath: sourceURL.path) {
-            urlToUse = sourceURL
-        } else if fm.fileExists(atPath: resolved.path) {
-            urlToUse = resolved
-        } else {
+        // NSTemporaryDirectory() e resolvingSymlinksInPath garantem path canônico
+        let src = sourceURL.resolvingSymlinksInPath()
+        guard fm.fileExists(atPath: src.path) else {
             throw NSError(domain: "VCam", code: 99, userInfo: [
-                NSLocalizedDescriptionKey: "Arquivo não encontrado.\nOriginal: \(sourceURL.path)\nResolvido: \(resolved.path)"
+                NSLocalizedDescriptionKey: "Arquivo exportado não encontrado:\n\(src.path)"
             ])
         }
         let dest = URL(fileURLWithPath: tempMovPath)
-        if fm.fileExists(atPath: tempMovPath) {
-            try fm.removeItem(at: dest)
+        try? fm.removeItem(at: dest)
+        // moveItem é mais rápido que copyItem (mesma partição)
+        do {
+            try fm.moveItem(at: src, to: dest)
+        } catch {
+            // Se move falhar, tenta copy como fallback
+            try fm.copyItem(at: src, to: dest)
         }
-        try fm.copyItem(at: urlToUse, to: dest)
         refresh()
         fixRotationIfNeeded()
     }

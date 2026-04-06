@@ -89,25 +89,27 @@ struct VideoPicker: UIViewControllerRepresentable {
         // MARK: - Export
 
         private func exportAsset(_ asset: AVAsset) {
-            // Exporta direto para o destino final do VCam — sem cópia intermediária
-            let dest = URL(fileURLWithPath: "/var/jb/var/mobile/Library/temp.mov")
-            try? FileManager.default.removeItem(at: dest)
+            // AVAssetExportSession só aceita paths no container do processo
+            // NSTemporaryDirectory() é garantido acessível para AVFoundation
+            let tmp = URL(fileURLWithPath: NSTemporaryDirectory())
+                .appendingPathComponent("vcam_export.mov")
+            try? FileManager.default.removeItem(at: tmp)
 
             guard let export = AVAssetExportSession(asset: asset,
                                                     presetName: AVAssetExportPresetHighestQuality) else {
                 DispatchQueue.main.async { self.onError("Sessão de exportação inválida.") }
                 return
             }
-            export.outputURL = dest
+            export.outputURL = tmp
             export.outputFileType = .mov
 
             export.exportAsynchronously {
-                if export.status == .completed {
-                    DispatchQueue.main.async { self.onPicked(dest) }
-                } else {
-                    let msg = export.error?.localizedDescription ?? "Exportação falhou (status: \(export.status.rawValue))."
+                guard export.status == .completed else {
+                    let msg = export.error?.localizedDescription ?? "Exportação falhou (status \(export.status.rawValue))."
                     DispatchQueue.main.async { self.onError(msg) }
+                    return
                 }
+                DispatchQueue.main.async { self.onPicked(tmp) }
             }
         }
     }
