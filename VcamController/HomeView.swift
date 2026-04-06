@@ -121,20 +121,33 @@ struct HomeView: View {
     private func applyVideo(from item: PhotosPickerItem) {
         isLoading = true
         item.loadTransferable(type: VideoTransferable.self) { result in
-            DispatchQueue.main.async {
-                isLoading = false
-                selectedItem = nil
-                switch result {
-                case .success(let video):
-                    if video != nil {
-                        vcam.refresh()
-                        // Corrige orientação se necessário
-                        vcam.fixRotationIfNeeded()
-                    } else {
-                        alertMessage = "Erro: não foi possível carregar o vídeo."
+            DispatchQueue.main.async { selectedItem = nil }
+            switch result {
+            case .success(let video):
+                guard let url = video?.url else {
+                    DispatchQueue.main.async {
+                        isLoading = false
+                        alertMessage = "Erro: vídeo inválido."
                         showAlert = true
                     }
-                case .failure(let error):
+                    return
+                }
+                // Copia do temporaryDirectory para temp.mov em background
+                DispatchQueue.global(qos: .userInitiated).async {
+                    do {
+                        try vcam.installVideo(from: url)
+                        DispatchQueue.main.async { isLoading = false }
+                    } catch {
+                        DispatchQueue.main.async {
+                            isLoading = false
+                            alertMessage = "Erro ao salvar: \(error.localizedDescription)"
+                            showAlert = true
+                        }
+                    }
+                }
+            case .failure(let error):
+                DispatchQueue.main.async {
+                    isLoading = false
                     alertMessage = "Erro: \(error.localizedDescription)"
                     showAlert = true
                 }

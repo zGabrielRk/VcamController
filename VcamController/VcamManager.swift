@@ -29,7 +29,18 @@ class VcamManager: ObservableObject {
 
     // MARK: - Activate
 
-    /// Chamado após o VideoTransferable já ter copiado o arquivo para tempMovPath
+    /// Copia o vídeo do temp dir para o destino final do VCam
+    func installVideo(from sourceURL: URL) throws {
+        let dest = URL(fileURLWithPath: tempMovPath)
+        let dir  = (tempMovPath as NSString).deletingLastPathComponent
+        try fm.createDirectory(atPath: dir, withIntermediateDirectories: true, attributes: nil)
+        try? fm.removeItem(at: dest)
+        try fm.copyItem(at: sourceURL, to: dest)
+        refresh()
+        fixRotationIfNeeded()
+    }
+
+    /// Corrige orientação se necessário
     func fixRotationIfNeeded() {
         let dest = URL(fileURLWithPath: tempMovPath)
         guard fm.fileExists(atPath: tempMovPath) else { return }
