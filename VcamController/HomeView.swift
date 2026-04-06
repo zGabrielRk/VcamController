@@ -1,6 +1,5 @@
 import SwiftUI
 import AVKit
-import Photos
 
 struct HomeView: View {
     @StateObject private var vcam = VcamManager.shared
@@ -61,7 +60,7 @@ struct HomeView: View {
             VStack(spacing: 10) {
 
                 HStack(spacing: 10) {
-                    Button { requestPhotosAndPick() } label: {
+                    Button { showPicker = true } label: {
                         PurpleButton(title: "Select")
                     }
 
@@ -93,6 +92,7 @@ struct HomeView: View {
         .sheet(isPresented: $showPicker) {
             VideoPicker(
                 onPicked: { exportedURL in
+                    isLoading = true
                     DispatchQueue.global(qos: .userInitiated).async {
                         do {
                             try vcam.installVideo(from: exportedURL)
@@ -112,7 +112,6 @@ struct HomeView: View {
                     showAlert = true
                 }
             )
-            .onAppear { isLoading = true }
         }
         .sheet(isPresented: $showPreview) {
             if vcam.isEnabled {
@@ -126,19 +125,6 @@ struct HomeView: View {
             Text(alertMessage)
         }
         .onAppear { vcam.refresh() }
-    }
-
-    private func requestPhotosAndPick() {
-        PHPhotoLibrary.requestAuthorization(for: .readWrite) { status in
-            DispatchQueue.main.async {
-                if status == .authorized || status == .limited {
-                    showPicker = true
-                } else {
-                    alertMessage = "Permissão de acesso à galeria é necessária para selecionar o vídeo."
-                    showAlert = true
-                }
-            }
-        }
     }
 
     private func openPreview() {

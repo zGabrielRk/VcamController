@@ -1,27 +1,29 @@
 import SwiftUI
-import PhotosUI
-import AVFoundation
+import MobileCoreServices
 
+/// Usa UIImagePickerController com AVAssetExportPresetPassthrough
+/// — mesmo fluxo do tweak vcamrootless.dylib
 struct VideoPicker: UIViewControllerRepresentable {
     let onPicked: (URL) -> Void
     let onError: (String) -> Void
 
-    func makeUIViewController(context: Context) -> PHPickerViewController {
-        var config = PHPickerConfiguration(photoLibrary: .shared())
-        config.filter = .videos
-        config.selectionLimit = 1
-        let picker = PHPickerViewController(configuration: config)
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = .photoLibrary
+        picker.mediaTypes = [kUTTypeMovie as String]
+        picker.allowsEditing = false
+        picker.videoExportPreset = AVAssetExportPresetPassthrough
         picker.delegate = context.coordinator
         return picker
     }
 
-    func updateUIViewController(_ uiViewController: PHPickerViewController, context: Context) {}
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
 
     func makeCoordinator() -> Coordinator {
         Coordinator(onPicked: onPicked, onError: onError)
     }
 
-    class Coordinator: NSObject, PHPickerViewControllerDelegate {
+    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
         let onPicked: (URL) -> Void
         let onError: (String) -> Void
 
@@ -30,95 +32,29 @@ struct VideoPicker: UIViewControllerRepresentable {
             self.onError = onError
         }
 
-        func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+        func imagePickerController(_ picker: UIImagePickerController,
+                                   didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
             picker.dismiss(animated: true)
-            guard let result = results.first else { return }
 
-            if let assetId = result.assetIdentifier {
-                exportViaPhotoLibrary(assetId: assetId)
-            } else {
-                // limited access — sem assetIdentifier, tentar via itemProvider
-                exportViaItemProvider(result.itemProvider)
-            }
-        }
-
-        // MARK: - Via PHAsset (full/limited access com assetIdentifier)
-
-        private func exportViaPhotoLibrary(assetId: String) {
-            let assets = PHAsset.fetchAssets(withLocalIdentifiers: [assetId], options: nil)
-            guard let asset = assets.firstObject else {
-                DispatchQueue.main.async { self.onError("Vídeo não encontrado na biblioteca.") }
+            guard let mediaURL = info[.mediaURL] as? URL else {
+                DispatchQueue.main.async { self.onError("URL do vídeo não encontrada.") }
                 return
             }
 
-            let opts = PHVideoRequestOptions()
-            opts.isNetworkAccessAllowed = true
-            opts.deliveryMode = .highQualityFormat
-
-            PHImageManager.default().requestAVAsset(forVideo: asset, options: opts) { avAsset, _, info in
-                guard let avAsset = avAsset else {
-                    let err = (info?[PHImageErrorKey] as? Error)?.localizedDescription ?? "Falha ao carregar vídeo."
-                    DispatchQueue.main.async { self.onError(err) }
-                    return
-                }
-                self.exportAsset(avAsset)
-            }
-        }
-
-        // MARK: - Via itemProvider (sem assetIdentifier)
-
-        private func exportViaItemProvider(_ provider: NSItemProvider) {
-            let typeId = "public.movie"
-            guard provider.hasItemConformingToTypeIdentifier(typeId) else {
-                DispatchQueue.main.async { self.onError("Formato de vídeo não suportado.") }
-                return
-            }
-            provider.loadFileRepresentation(forTypeIdentifier: typeId) { url, error in
-                guard let url = url else {
-                    DispatchQueue.main.async {
-                        self.onError(error?.localizedDescription ?? "Vídeo não disponível.")
-                    }
-                    return
-                }
-                // url válida apenas aqui — criar AVURLAsset e exportar antes de retornar
-                let asset = AVURLAsset(url: url)
-                self.exportAsset(asset)
-            }
-        }
-
-        // MARK: - Export
-
-        private func exportAsset(_ asset: AVAsset) {
-            // AVAssetExportSession só aceita paths no container do processo
-            // NSTemporaryDirectory() é garantido acessível para AVFoundation
-            let tmp = URL(fileURLWithPath: NSTemporaryDirectory())
+            // mediaURL é path temporário acessível — copiar para nosso tmp canônico
+            let dest = URL(fileURLWithPath: NSTemporaryDirectory())
                 .appendingPathComponent("vcam_export.mov")
-            try? FileManager.default.removeItem(at: tmp)
-
-            guard let export = AVAssetExportSession(asset: asset,
-                                                    presetName: AVAssetExportPresetHighestQuality) else {
-                DispatchQueue.main.async { self.onError("Sessão de exportação inválida.") }
-                return
+            do {
+                try? FileManager.default.removeItem(at: dest)
+                try FileManager.default.copyItem(at: mediaURL, to: dest)
+                DispatchQueue.main.async { self.onPicked(dest) }
+            } catch {
+                DispatchQueue.main.async { self.onError("Erro ao copiar vídeo: \(error.localizedDescription)") }
             }
-            export.outputURL = tmp
-            export.outputFileType = .mov
+        }
 
-            export.exportAsynchronously {
-                guard export.status == .completed else {
-                    let msg = export.error?.localizedDescription ?? "Exportação falhou (status \(export.status.rawValue))."
-                    DispatchQueue.main.async { self.onError(msg) }
-                    return
-                }
-                // Verifica se o arquivo foi realmente criado
-                let exists = FileManager.default.fileExists(atPath: tmp.path)
-                guard exists else {
-                    DispatchQueue.main.async {
-                        self.onError("Export OK mas arquivo não criado.\nPath: \(tmp.path)")
-                    }
-                    return
-                }
-                DispatchQueue.main.async { self.onPicked(tmp) }
-            }
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            picker.dismiss(animated: true)
         }
     }
 }
