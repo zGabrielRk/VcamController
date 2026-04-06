@@ -53,6 +53,10 @@ struct VideoPicker: UIViewControllerRepresentable {
                     DispatchQueue.main.async { self.onError("Não foi possível carregar o vídeo.") }
                     return
                 }
+                // Alguns sistemas fornecem URL com security scope — precisamos abrir antes de copiar
+                let accessed = url.startAccessingSecurityScopedResource()
+                defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+
                 // Copia direto para o diretório do vcam (sabemos que temos acesso)
                 let vcamDir = "/var/jb/var/mobile/Library"
                 let dest    = URL(fileURLWithPath: "\(vcamDir)/vcam_staging.mov")
