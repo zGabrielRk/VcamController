@@ -35,17 +35,21 @@ class VcamManager: ObservableObject {
         let src = sourceURL.resolvingSymlinksInPath()
         guard fm.fileExists(atPath: src.path) else {
             throw NSError(domain: "VCam", code: 99, userInfo: [
-                NSLocalizedDescriptionKey: "Arquivo exportado não encontrado:\n\(src.path)"
+                NSLocalizedDescriptionKey: "Exportado não encontrado:\nsrc=\(src.path)\norig=\(sourceURL.path)"
             ])
         }
         let dest = URL(fileURLWithPath: tempMovPath)
         try? fm.removeItem(at: dest)
-        // moveItem é mais rápido que copyItem (mesma partição)
         do {
             try fm.moveItem(at: src, to: dest)
-        } catch {
-            // Se move falhar, tenta copy como fallback
-            try fm.copyItem(at: src, to: dest)
+        } catch let moveErr {
+            do {
+                try fm.copyItem(at: src, to: dest)
+            } catch let copyErr {
+                throw NSError(domain: "VCam", code: 100, userInfo: [
+                    NSLocalizedDescriptionKey: "move: \(moveErr.localizedDescription)\ncopy: \(copyErr.localizedDescription)\nsrc=\(src.path)"
+                ])
+            }
         }
         refresh()
         fixRotationIfNeeded()

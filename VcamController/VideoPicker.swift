@@ -109,6 +109,14 @@ struct VideoPicker: UIViewControllerRepresentable {
                     DispatchQueue.main.async { self.onError(msg) }
                     return
                 }
+                // Verifica se o arquivo foi realmente criado
+                let exists = FileManager.default.fileExists(atPath: tmp.path)
+                guard exists else {
+                    DispatchQueue.main.async {
+                        self.onError("Export OK mas arquivo não criado.\nPath: \(tmp.path)")
+                    }
+                    return
+                }
                 DispatchQueue.main.async { self.onPicked(tmp) }
             }
         }
