@@ -133,7 +133,7 @@ static NSString *const kMirrorMarkPath = @"/var/jb/var/mobile/Library/vcam_is_mi
     size_t w = CVPixelBufferGetWidth(imgBuf);
     size_t h = CVPixelBufferGetHeight(imgBuf);
 
-    CIImage *ci = [CIImage imageWithCVImageBuffer:imgBuf];
+    CIImage *ci = [CIImage imageWithCVPixelBuffer:(CVPixelBufferRef)imgBuf];
     ci = [ci imageByApplyingTransform:CGAffineTransformMakeScale(-1, 1)];
 
     CVPixelBufferRef mirrorBuf = NULL;
@@ -178,23 +178,26 @@ static NSString *const kMirrorMarkPath = @"/var/jb/var/mobile/Library/vcam_is_mi
 didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
        fromConnection:(AVCaptureConnection *)connection {
 
+    id<AVCaptureVideoDataOutputSampleBufferDelegate> delegate = self.original;
+    if (!delegate) return;
+
     CMSampleBufferRef fake = [[VcamEngine shared] nextFakeBufferMatchingTiming:sampleBuffer];
     CMSampleBufferRef toDeliver = fake ? fake : sampleBuffer;
 
-    [_original captureOutput:output
-       didOutputSampleBuffer:toDeliver
-              fromConnection:connection];
+    [delegate captureOutput:output
+      didOutputSampleBuffer:toDeliver
+             fromConnection:connection];
 
     if (fake) CFRelease(fake);
 }
 
 // Forward any other delegate methods
 - (BOOL)respondsToSelector:(SEL)sel {
-    return [_original respondsToSelector:sel] || [super respondsToSelector:sel];
+    return [self.original respondsToSelector:sel] || [super respondsToSelector:sel];
 }
 
 - (id)forwardingTargetForSelector:(SEL)sel {
-    return _original;
+    return self.original;
 }
 
 @end
@@ -205,15 +208,17 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
 
 static IMP orig_setSampleBufferDelegate = NULL;
 
-static void hooked_setSampleBufferDelegate(AVCaptureVideoDataOutput *self,
+static void hooked_setSampleBufferDelegate(AVCaptureVideoDataOutput *target,
                                             SEL sel,
                                             id<AVCaptureVideoDataOutputSampleBufferDelegate> delegate,
                                             dispatch_queue_t queue) {
+    typedef void (*SetDelegateFn)(id, SEL, id, dispatch_queue_t);
+    SetDelegateFn fn = (SetDelegateFn)orig_setSampleBufferDelegate;
     if (delegate && ![delegate isKindOfClass:[VcamDelegateProxy class]]) {
         VcamDelegateProxy *proxy = [VcamDelegateProxy proxyFor:delegate];
-        ((void (*)(id, SEL, id, dispatch_queue_t))orig_setSampleBufferDelegate)(self, sel, proxy, queue);
+        fn(target, sel, proxy, queue);
     } else {
-        ((void (*)(id, SEL, id, dispatch_queue_t))orig_setSampleBufferDelegate)(self, sel, delegate, queue);
+        fn(target, sel, delegate, queue);
     }
 }
 

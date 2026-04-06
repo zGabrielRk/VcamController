@@ -31,12 +31,34 @@ jobs:
             PROVISIONING_PROFILE=""
 
       # ── 2. Compile VcamTweak dylib ───────────────────────────────────────
+      - name: Show Xcode and SDK version
+        run: |
+          xcodebuild -version
+          xcrun -sdk iphoneos --show-sdk-version
+
+      - name: Syntax-check VcamTweak.m
+        run: |
+          xcrun -sdk iphoneos clang \
+            -arch arm64 \
+            -fsyntax-only \
+            -fobjc-arc \
+            -Wno-deprecated-declarations \
+            -framework Foundation \
+            -framework AVFoundation \
+            -framework CoreMedia \
+            -framework CoreVideo \
+            -framework CoreImage \
+            -framework UIKit \
+            -miphoneos-version-min=16.0 \
+            VcamTweak/VcamTweak.m 2>&1 || true
+
       - name: Compile VcamTweak dylib
         run: |
           xcrun -sdk iphoneos clang \
             -arch arm64 \
             -dynamiclib \
             -fobjc-arc \
+            -Wno-deprecated-declarations \
             -framework Foundation \
             -framework AVFoundation \
             -framework CoreMedia \
