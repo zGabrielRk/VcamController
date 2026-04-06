@@ -89,13 +89,10 @@ struct VideoPicker: UIViewControllerRepresentable {
         // MARK: - Export
 
         private func exportAsset(_ asset: AVAsset) {
-            // Usa Documents do app — sempre acessível, AVFoundation não restringe
-            let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
-                ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Documents")
-            let dest = docs.appendingPathComponent("vcam_export.mov")
+            // Exporta direto para o destino final do VCam — sem cópia intermediária
+            let dest = URL(fileURLWithPath: "/var/jb/var/mobile/Library/temp.mov")
             try? FileManager.default.removeItem(at: dest)
 
-            // HighestQuality funciona com todos os formatos (Passthrough pode falhar com HEVC)
             guard let export = AVAssetExportSession(asset: asset,
                                                     presetName: AVAssetExportPresetHighestQuality) else {
                 DispatchQueue.main.async { self.onError("Sessão de exportação inválida.") }

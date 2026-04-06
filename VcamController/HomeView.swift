@@ -92,19 +92,11 @@ struct HomeView: View {
         .background(Color(hex: "111113"))
         .sheet(isPresented: $showPicker) {
             VideoPicker(
-                onPicked: { url in
-                    DispatchQueue.global(qos: .userInitiated).async {
-                        do {
-                            try vcam.installVideo(from: url)
-                            DispatchQueue.main.async { isLoading = false }
-                        } catch {
-                            DispatchQueue.main.async {
-                                isLoading = false
-                                alertMessage = "Erro ao salvar: \(error.localizedDescription)"
-                                showAlert = true
-                            }
-                        }
-                    }
+                onPicked: { _ in
+                    // Arquivo já está em temp.mov — só atualiza o estado
+                    isLoading = false
+                    vcam.refresh()
+                    vcam.fixRotationIfNeeded()
                 },
                 onError: { msg in
                     isLoading = false
