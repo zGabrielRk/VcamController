@@ -17,8 +17,8 @@
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 
-static NSString *const kTempMovPath    = @"/var/jb/var/mobile/Library/temp.mov";
-static NSString *const kMirrorMarkPath = @"/var/jb/var/mobile/Library/vcam_is_mirrored_mark";
+static NSString *const kTempMovPath    = @"/var/mobile/Library/VCam/temp.mov";
+static NSString *const kMirrorMarkPath = @"/var/mobile/Library/VCam/vcam_is_mirrored_mark";
 
 // ---------------------------------------------------------------------------
 // MARK: - VcamEngine  (video reader + frame processing)
@@ -230,7 +230,7 @@ __attribute__((constructor))
 static void VcamTweakInit(void) {
     @autoreleasepool {
         // Ensure vcam directory exists
-        NSString *dir = @"/var/jb/var/mobile/Library";
+        NSString *dir = @"/var/mobile/Library/VCam";
         NSFileManager *fm = [NSFileManager defaultManager];
         if (![fm fileExistsAtPath:dir]) {
             [fm createDirectoryAtPath:dir

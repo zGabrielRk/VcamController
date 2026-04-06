@@ -30,15 +30,6 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             PROVISIONING_PROFILE=""
 
-      # ── 1b. Embed entitlements via ldid (no-sandbox) ─────────────────────
-      - name: Install ldid
-        run: brew install ldid
-
-      - name: Embed entitlements into app binary
-        run: |
-          APP=$(find build -name "VcamController.app" -type d | head -1)
-          ldid -SVcamController/VcamController.entitlements "$APP/VcamController"
-
       # ── 2. Compile VcamTweak dylib ───────────────────────────────────────
       - name: Show Xcode and SDK version
         run: |

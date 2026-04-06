@@ -5,8 +5,8 @@ import UIKit
 class VcamManager: ObservableObject {
     static let shared = VcamManager()
 
-    let tempMovPath    = "/var/jb/var/mobile/Library/temp.mov"
-    let mirrorMarkPath = "/var/jb/var/mobile/Library/vcam_is_mirrored_mark"
+    let tempMovPath    = "/var/mobile/Library/VCam/temp.mov"
+    let mirrorMarkPath = "/var/mobile/Library/VCam/vcam_is_mirrored_mark"
 
     @Published var isEnabled: Bool  = false
     @Published var isMirrored: Bool = false
