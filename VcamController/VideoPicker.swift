@@ -53,18 +53,16 @@ struct VideoPicker: UIViewControllerRepresentable {
                     DispatchQueue.main.async { self.onError("Não foi possível carregar o vídeo.") }
                     return
                 }
-                // NSHomeDirectory() dá o caminho real do container sem symlinks
-                let dest = URL(fileURLWithPath: NSHomeDirectory())
-                    .appendingPathComponent("tmp/vcam_pending.mov")
-                    .resolvingSymlinksInPath()
+                // Copia direto para o diretório do vcam (sabemos que temos acesso)
+                let vcamDir = "/var/jb/var/mobile/Library"
+                let dest    = URL(fileURLWithPath: "\(vcamDir)/vcam_staging.mov")
                 do {
-                    try? FileManager.default.removeItem(at: dest)
-                    // Cria o diretório tmp se não existir
                     try? FileManager.default.createDirectory(
-                        at: dest.deletingLastPathComponent(),
+                        atPath: vcamDir,
                         withIntermediateDirectories: true,
                         attributes: nil
                     )
+                    try? FileManager.default.removeItem(at: dest)
                     try FileManager.default.copyItem(at: url, to: dest)
                     DispatchQueue.main.async { self.onPicked(dest) }
                 } catch {

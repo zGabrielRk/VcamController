@@ -6,6 +6,7 @@ class VcamManager: ObservableObject {
     static let shared = VcamManager()
 
     let tempMovPath    = "/var/jb/var/mobile/Library/temp.mov"
+    let stagingMovPath = "/var/jb/var/mobile/Library/vcam_staging.mov"
     let mirrorMarkPath = "/var/jb/var/mobile/Library/vcam_is_mirrored_mark"
 
     @Published var isEnabled: Bool  = false
@@ -30,18 +31,16 @@ class VcamManager: ObservableObject {
     // MARK: - Activate
 
     func setVideo(from sourceURL: URL) throws {
-        // Resolve symlinks so /var/... and /private/var/... are treated as the same path
-        let resolvedSource = sourceURL.resolvingSymlinksInPath()
-        guard fm.fileExists(atPath: resolvedSource.path) else {
+        guard fm.fileExists(atPath: sourceURL.path) else {
             throw NSError(domain: "VCamManager", code: 2, userInfo: [
-                NSLocalizedDescriptionKey: "Arquivo não encontrado: \(resolvedSource.lastPathComponent)\nCaminho: \(resolvedSource.path)"
+                NSLocalizedDescriptionKey: "Vídeo não encontrado. Por favor selecione novamente."
             ])
         }
         let dest = URL(fileURLWithPath: tempMovPath)
         let dir  = (tempMovPath as NSString).deletingLastPathComponent
         try? fm.createDirectory(atPath: dir, withIntermediateDirectories: true, attributes: nil)
         try? fm.removeItem(at: dest)
-        try fm.copyItem(at: resolvedSource, to: dest)
+        try fm.copyItem(at: sourceURL, to: dest)
         refresh()
 
         // Corrige orientação se necessário (igual ao VCamAppIOS)
