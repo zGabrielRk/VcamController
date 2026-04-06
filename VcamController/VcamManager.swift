@@ -6,7 +6,6 @@ class VcamManager: ObservableObject {
     static let shared = VcamManager()
 
     let tempMovPath    = "/var/jb/var/mobile/Library/temp.mov"
-    let stagingMovPath = "/var/jb/var/mobile/Library/vcam_staging.mov"
     let mirrorMarkPath = "/var/jb/var/mobile/Library/vcam_is_mirrored_mark"
 
     @Published var isEnabled: Bool  = false
@@ -30,35 +29,25 @@ class VcamManager: ObservableObject {
 
     // MARK: - Activate
 
-    func setVideo(from sourceURL: URL) throws {
-        guard fm.fileExists(atPath: sourceURL.path) else {
-            throw NSError(domain: "VCamManager", code: 2, userInfo: [
-                NSLocalizedDescriptionKey: "Vídeo não encontrado. Por favor selecione novamente."
-            ])
-        }
+    /// Chamado após o VideoTransferable já ter copiado o arquivo para tempMovPath
+    func fixRotationIfNeeded() {
         let dest = URL(fileURLWithPath: tempMovPath)
-        let dir  = (tempMovPath as NSString).deletingLastPathComponent
-        try? fm.createDirectory(atPath: dir, withIntermediateDirectories: true, attributes: nil)
-        try? fm.removeItem(at: dest)
-        try fm.copyItem(at: sourceURL, to: dest)
-        refresh()
-
-        // Corrige orientação se necessário (igual ao VCamAppIOS)
+        guard fm.fileExists(atPath: tempMovPath) else { return }
         let rotation = detectNeededRotation(url: dest)
-        if rotation != 0 {
-            DispatchQueue.main.async { self.isFixing = true }
-            DispatchQueue.global(qos: .userInitiated).async {
-                let tmp = self.fm.temporaryDirectory
-                    .appendingPathComponent("vcam_fix_\(Int(Date().timeIntervalSince1970)).mov")
-                self.exportRotated(sourceURL: dest, outputURL: tmp, degrees: rotation) { error in
-                    DispatchQueue.main.async {
-                        self.isFixing = false
-                        if error == nil {
-                            try? self.fm.removeItem(at: dest)
-                            try? self.fm.moveItem(at: tmp, to: dest)
-                        }
-                        self.refresh()
+        guard rotation != 0 else { return }
+
+        isFixing = true
+        DispatchQueue.global(qos: .userInitiated).async {
+            let tmp = self.fm.temporaryDirectory
+                .appendingPathComponent("vcam_fix_\(Int(Date().timeIntervalSince1970)).mov")
+            self.exportRotated(sourceURL: dest, outputURL: tmp, degrees: rotation) { error in
+                DispatchQueue.main.async {
+                    self.isFixing = false
+                    if error == nil {
+                        try? self.fm.removeItem(at: dest)
+                        try? self.fm.moveItem(at: tmp, to: dest)
                     }
+                    self.refresh()
                 }
             }
         }
