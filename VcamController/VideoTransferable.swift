@@ -9,9 +9,10 @@ struct VideoTransferable: Transferable {
         FileRepresentation(contentType: UTType("public.movie")!) { video in
             SentTransferredFile(video.url)
         } importing: { received in
-            // temporaryDirectory é sempre acessível — sem risco de falha aqui
+            // .resolvingSymlinksInPath() garante /private/var/... em vez de /var/...
             let dest = FileManager.default.temporaryDirectory
                 .appendingPathComponent("vcam_import.mov")
+                .resolvingSymlinksInPath()
             try? FileManager.default.removeItem(at: dest)
             try FileManager.default.copyItem(at: received.file, to: dest)
             return Self(url: dest)
