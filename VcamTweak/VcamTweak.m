@@ -19,6 +19,7 @@
 #import <CoreImage/CoreImage.h>
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
+#include <os/lock.h>
 #include "fishhook.h"
 
 static NSString *const kTempMovPath    = @"/var/mobile/Library/VCam/temp.mov";
@@ -262,11 +263,11 @@ static CVImageBufferRef hooked_CMSampleBufferGetImageBuffer(CMSampleBufferRef sb
     // release CVPixelBufferRef from CMSampleBufferGetImageBuffer (it's borrowed).
     // We need to keep it alive until the next frame. Use a static with lock.
     static CVPixelBufferRef sPrevFake = NULL;
-    static OSSpinLock sLock = OS_SPINLOCK_INIT;
-    OSSpinLockLock(&sLock);
+    static os_unfair_lock sLock = OS_UNFAIR_LOCK_INIT;
+    os_unfair_lock_lock(&sLock);
     CVPixelBufferRef prev = sPrevFake;
-    sPrevFake = fake;  // retain is already held from nextFakePixelBufferWithSize
-    OSSpinLockUnlock(&sLock);
+    sPrevFake = fake;
+    os_unfair_lock_unlock(&sLock);
     if (prev) CVPixelBufferRelease(prev);
 
     return (CVImageBufferRef)fake;
