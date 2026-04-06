@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFoundation
 import MobileCoreServices
 
 /// Usa UIImagePickerController com AVAssetExportPresetPassthrough
