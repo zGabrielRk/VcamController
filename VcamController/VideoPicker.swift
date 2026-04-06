@@ -7,7 +7,8 @@ struct VideoPicker: UIViewControllerRepresentable {
     let onError: (String) -> Void
 
     func makeUIViewController(context: Context) -> PHPickerViewController {
-        var config = PHPickerConfiguration()
+        // photoLibrary: .shared() permite assetIdentifier no resultado
+        var config = PHPickerConfiguration(photoLibrary: .shared())
         config.filter = .videos
         config.selectionLimit = 1
         let picker = PHPickerViewController(configuration: config)
@@ -32,41 +33,66 @@ struct VideoPicker: UIViewControllerRepresentable {
 
         func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
             picker.dismiss(animated: true)
-            guard let result = results.first else { return }
+            guard let assetId = results.first?.assetIdentifier else {
+                // Sem assetIdentifier = sem permissão — tentar via itemProvider
+                if let provider = results.first?.itemProvider {
+                    loadViaItemProvider(provider)
+                }
+                return
+            }
 
-            result.itemProvider.loadFileRepresentation(forTypeIdentifier: "public.movie") { url, error in
-                if let error = error {
-                    DispatchQueue.main.async { self.onError(error.localizedDescription) }
+            let assets = PHAsset.fetchAssets(withLocalIdentifiers: [assetId], options: nil)
+            guard let asset = assets.firstObject else {
+                DispatchQueue.main.async { self.onError("Vídeo não encontrado na biblioteca.") }
+                return
+            }
+
+            let opts = PHVideoRequestOptions()
+            opts.isNetworkAccessAllowed = true
+            opts.deliveryMode = .highQualityFormat
+
+            // requestExportSession é a API oficial para exportar vídeos da galeria
+            PHImageManager.default().requestExportSession(
+                forVideo: asset,
+                options: opts,
+                exportPreset: AVAssetExportPresetPassthrough
+            ) { session, _ in
+                guard let session = session else {
+                    DispatchQueue.main.async { self.onError("Falha ao criar sessão de exportação.") }
                     return
                 }
+                self.runExport(session)
+            }
+        }
+
+        private func loadViaItemProvider(_ provider: NSItemProvider) {
+            provider.loadFileRepresentation(forTypeIdentifier: "public.movie") { url, error in
                 guard let url = url else {
-                    DispatchQueue.main.async { self.onError("Vídeo não encontrado.") }
+                    DispatchQueue.main.async {
+                        self.onError(error?.localizedDescription ?? "Vídeo não disponível.")
+                    }
                     return
                 }
-
-                // AVAssetExportSession lê o arquivo via AVFoundation (acesso nativo à galeria)
-                // e escreve no destino que controlamos — bypassa restrições de FileManager
-                let dest = URL(fileURLWithPath: "/var/mobile/Library/Caches/vcam_export.mov")
-                try? FileManager.default.removeItem(at: dest)
-
                 let asset = AVURLAsset(url: url)
-                guard let export = AVAssetExportSession(asset: asset,
-                                                        presetName: AVAssetExportPresetPassthrough) else {
-                    DispatchQueue.main.async { self.onError("Erro ao criar sessão de exportação.") }
+                guard let session = AVAssetExportSession(asset: asset,
+                                                         presetName: AVAssetExportPresetPassthrough) else {
+                    DispatchQueue.main.async { self.onError("Sessão de exportação inválida.") }
                     return
                 }
-                export.outputURL = dest
-                export.outputFileType = .mov
+                self.runExport(session)
+            }
+        }
 
-                // Exporta sincronamente dentro do callback (url ainda válida)
-                let sema = DispatchSemaphore(value: 0)
-                export.exportAsynchronously { sema.signal() }
-                sema.wait()
-
-                if export.status == .completed {
+        private func runExport(_ session: AVAssetExportSession) {
+            let dest = URL(fileURLWithPath: "/var/mobile/Library/Caches/vcam_export.mov")
+            try? FileManager.default.removeItem(at: dest)
+            session.outputURL = dest
+            session.outputFileType = .mov
+            session.exportAsynchronously {
+                if session.status == .completed {
                     DispatchQueue.main.async { self.onPicked(dest) }
                 } else {
-                    let msg = export.error?.localizedDescription ?? "Falha na exportação."
+                    let msg = session.error?.localizedDescription ?? "Falha na exportação."
                     DispatchQueue.main.async { self.onError(msg) }
                 }
             }
