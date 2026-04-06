@@ -9,8 +9,8 @@ struct VideoTransferable: Transferable {
         FileRepresentation(contentType: UTType("public.movie")!) { video in
             SentTransferredFile(video.url)
         } importing: { received in
-            let dest = FileManager.default.temporaryDirectory
-                .appendingPathComponent("vcam_import.mov")
+            // /var/mobile/Library/Caches/ é owned by mobile — sempre acessível com no-sandbox
+            let dest = URL(fileURLWithPath: "/var/mobile/Library/Caches/vcam_import.mov")
             try? FileManager.default.removeItem(at: dest)
             try FileManager.default.copyItem(at: received.file, to: dest)
             return Self(url: dest)
