@@ -134,8 +134,7 @@ static NSString *const kMirrorMarkPath = @"/var/jb/var/mobile/Library/vcam_is_mi
     size_t h = CVPixelBufferGetHeight(imgBuf);
 
     CIImage *ci = [CIImage imageWithCVImageBuffer:imgBuf];
-    ci = [ci imageByApplyingTransform:CGAffineTransformMakeScale(-1, 1)
-                         highQualityDownsample:NO];
+    ci = [ci imageByApplyingTransform:CGAffineTransformMakeScale(-1, 1)];
 
     CVPixelBufferRef mirrorBuf = NULL;
     CVPixelBufferCreate(kCFAllocatorDefault, w, h, kCVPixelFormatType_32BGRA, NULL, &mirrorBuf);
