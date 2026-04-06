@@ -223,6 +223,51 @@ static void hooked_setSampleBufferDelegate(AVCaptureVideoDataOutput *target,
 }
 
 // ---------------------------------------------------------------------------
+// MARK: - Hook AVCaptureSession startRunning (catch delegates set before our hook)
+// ---------------------------------------------------------------------------
+
+static IMP orig_startRunning = NULL;
+
+static void hooked_startRunning(AVCaptureSession *self, SEL sel) {
+    @autoreleasepool {
+        for (AVCaptureOutput *output in self.outputs) {
+            if (![output isKindOfClass:[AVCaptureVideoDataOutput class]]) continue;
+            AVCaptureVideoDataOutput *vdo = (AVCaptureVideoDataOutput *)output;
+            id<AVCaptureVideoDataOutputSampleBufferDelegate> delegate = vdo.sampleBufferDelegate;
+            if (delegate && ![delegate isKindOfClass:[VcamDelegateProxy class]]) {
+                dispatch_queue_t q = vdo.sampleBufferCallbackQueue ?: dispatch_get_main_queue();
+                VcamDelegateProxy *proxy = [VcamDelegateProxy proxyFor:delegate];
+                // Use original setSampleBufferDelegate to avoid re-hooking loop
+                typedef void (*SetDelegateFn)(id, SEL, id, dispatch_queue_t);
+                SetDelegateFn fn = (SetDelegateFn)orig_setSampleBufferDelegate;
+                fn(vdo, @selector(setSampleBufferDelegate:queue:), proxy, q);
+            }
+        }
+    }
+    ((void(*)(id,SEL))orig_startRunning)(self, sel);
+}
+
+static IMP orig_startRunningCompletion = NULL;
+
+static void hooked_startRunningCompletion(AVCaptureSession *self, SEL sel, void(^completion)(BOOL, NSError*)) {
+    @autoreleasepool {
+        for (AVCaptureOutput *output in self.outputs) {
+            if (![output isKindOfClass:[AVCaptureVideoDataOutput class]]) continue;
+            AVCaptureVideoDataOutput *vdo = (AVCaptureVideoDataOutput *)output;
+            id<AVCaptureVideoDataOutputSampleBufferDelegate> delegate = vdo.sampleBufferDelegate;
+            if (delegate && ![delegate isKindOfClass:[VcamDelegateProxy class]]) {
+                dispatch_queue_t q = vdo.sampleBufferCallbackQueue ?: dispatch_get_main_queue();
+                VcamDelegateProxy *proxy = [VcamDelegateProxy proxyFor:delegate];
+                typedef void (*SetDelegateFn)(id, SEL, id, dispatch_queue_t);
+                SetDelegateFn fn = (SetDelegateFn)orig_setSampleBufferDelegate;
+                fn(vdo, @selector(setSampleBufferDelegate:queue:), proxy, q);
+            }
+        }
+    }
+    ((void(*)(id,SEL,void(^)(BOOL,NSError*)))orig_startRunningCompletion)(self, sel, completion);
+}
+
+// ---------------------------------------------------------------------------
 // MARK: - Constructor
 // ---------------------------------------------------------------------------
 
@@ -239,12 +284,26 @@ static void VcamTweakInit(void) {
                                 error:nil];
         }
 
-        // Hook AVCaptureVideoDataOutput
-        Class cls = [AVCaptureVideoDataOutput class];
-        SEL sel = @selector(setSampleBufferDelegate:queue:);
-        Method m = class_getInstanceMethod(cls, sel);
+        // Hook AVCaptureVideoDataOutput setSampleBufferDelegate:queue:
+        Class vdoCls = [AVCaptureVideoDataOutput class];
+        SEL setSel = @selector(setSampleBufferDelegate:queue:);
+        Method m = class_getInstanceMethod(vdoCls, setSel);
         if (m) {
             orig_setSampleBufferDelegate = method_setImplementation(m, (IMP)hooked_setSampleBufferDelegate);
+        }
+
+        // Hook AVCaptureSession startRunning (catches pre-existing delegates)
+        Class sesCls = [AVCaptureSession class];
+        Method m2 = class_getInstanceMethod(sesCls, @selector(startRunning));
+        if (m2) {
+            orig_startRunning = method_setImplementation(m2, (IMP)hooked_startRunning);
+        }
+
+        // Hook AVCaptureSession startRunningWithCompletionHandler: (iOS 17+)
+        SEL startCompSel = NSSelectorFromString(@"startRunningWithCompletionHandler:");
+        Method m3 = class_getInstanceMethod(sesCls, startCompSel);
+        if (m3) {
+            orig_startRunningCompletion = method_setImplementation(m3, (IMP)hooked_startRunningCompletion);
         }
     }
 }
