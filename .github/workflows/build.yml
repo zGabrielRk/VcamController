@@ -50,7 +50,8 @@ jobs:
             -framework CoreVideo \
             -framework CoreImage \
             -framework UIKit \
-            VcamTweak/VcamTweak.m 2>&1 || true
+            VcamTweak/VcamTweak.m \
+            VcamTweak/fishhook.c 2>&1 || true
 
       - name: Compile VcamTweak dylib
         run: |
@@ -69,7 +70,8 @@ jobs:
             -framework UIKit \
             -install_name /var/jb/Library/MobileSubstrate/DynamicLibraries/VcamTweak.dylib \
             -o VcamTweak.dylib \
-            VcamTweak/VcamTweak.m
+            VcamTweak/VcamTweak.m \
+            VcamTweak/fishhook.c
 
       # ── 3. Assemble .deb package ─────────────────────────────────────────
       - name: Install dpkg
