@@ -5,14 +5,11 @@ struct VideoTransferable: Transferable {
     let url: URL
 
     static var transferRepresentation: some TransferRepresentation {
-        // "public.movie" cobre TODOS os formatos (.mov, .mp4, HEVC, etc.)
-        FileRepresentation(contentType: UTType("public.movie")!) { video in
-            SentTransferredFile(video.url)
-        } importing: { received in
-            // /var/mobile/Library/Caches/ é owned by mobile — sempre acessível com no-sandbox
+        // DataRepresentation entrega os bytes direto — sem URL de arquivo, sem problema de acesso
+        DataRepresentation(importedContentType: UTType("public.movie")!) { data in
             let dest = URL(fileURLWithPath: "/var/mobile/Library/Caches/vcam_import.mov")
             try? FileManager.default.removeItem(at: dest)
-            try FileManager.default.copyItem(at: received.file, to: dest)
+            try data.write(to: dest, options: .atomic)
             return Self(url: dest)
         }
     }
