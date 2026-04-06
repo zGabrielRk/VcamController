@@ -8,8 +8,9 @@ struct VideoTransferable: Transferable {
         FileRepresentation(contentType: .movie) { video in
             SentTransferredFile(video.url)
         } importing: { received in
-            let dest = FileManager.default.temporaryDirectory
-                .appendingPathComponent("vcam_pending.mov")
+            let dest = URL(fileURLWithPath: NSHomeDirectory())
+                .appendingPathComponent("tmp/vcam_pending.mov")
+                .resolvingSymlinksInPath()
             try? FileManager.default.removeItem(at: dest)
             try FileManager.default.copyItem(at: received.file, to: dest)
             return Self(url: dest)

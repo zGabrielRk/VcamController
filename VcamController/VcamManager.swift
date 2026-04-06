@@ -30,16 +30,18 @@ class VcamManager: ObservableObject {
     // MARK: - Activate
 
     func setVideo(from sourceURL: URL) throws {
-        guard fm.fileExists(atPath: sourceURL.path) else {
+        // Resolve symlinks so /var/... and /private/var/... are treated as the same path
+        let resolvedSource = sourceURL.resolvingSymlinksInPath()
+        guard fm.fileExists(atPath: resolvedSource.path) else {
             throw NSError(domain: "VCamManager", code: 2, userInfo: [
-                NSLocalizedDescriptionKey: "Arquivo não encontrado. Tente selecionar novamente."
+                NSLocalizedDescriptionKey: "Arquivo não encontrado: \(resolvedSource.lastPathComponent)\nCaminho: \(resolvedSource.path)"
             ])
         }
         let dest = URL(fileURLWithPath: tempMovPath)
         let dir  = (tempMovPath as NSString).deletingLastPathComponent
         try? fm.createDirectory(atPath: dir, withIntermediateDirectories: true, attributes: nil)
         try? fm.removeItem(at: dest)
-        try fm.copyItem(at: sourceURL, to: dest)
+        try fm.copyItem(at: resolvedSource, to: dest)
         refresh()
 
         // Corrige orientação se necessário (igual ao VCamAppIOS)

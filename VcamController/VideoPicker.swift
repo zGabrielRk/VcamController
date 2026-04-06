@@ -53,11 +53,18 @@ struct VideoPicker: UIViewControllerRepresentable {
                     DispatchQueue.main.async { self.onError("Não foi possível carregar o vídeo.") }
                     return
                 }
-                // Copia para o temp dir do app (sempre acessível, igual ao VCamAppIOS)
-                let dest = FileManager.default.temporaryDirectory
-                    .appendingPathComponent("vcam_pending.mov")
+                // NSHomeDirectory() dá o caminho real do container sem symlinks
+                let dest = URL(fileURLWithPath: NSHomeDirectory())
+                    .appendingPathComponent("tmp/vcam_pending.mov")
+                    .resolvingSymlinksInPath()
                 do {
                     try? FileManager.default.removeItem(at: dest)
+                    // Cria o diretório tmp se não existir
+                    try? FileManager.default.createDirectory(
+                        at: dest.deletingLastPathComponent(),
+                        withIntermediateDirectories: true,
+                        attributes: nil
+                    )
                     try FileManager.default.copyItem(at: url, to: dest)
                     DispatchQueue.main.async { self.onPicked(dest) }
                 } catch {
