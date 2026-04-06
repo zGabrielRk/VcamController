@@ -12,20 +12,19 @@ jobs:
   build:
     runs-on: macos-14
 
+    env:
+      THEOS: /opt/theos
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup Theos
         run: |
-          export THEOS=~/theos
-          echo "THEOS=$THEOS" >> $GITHUB_ENV
-
           git clone --recursive https://github.com/theos/theos.git $THEOS
 
-          # Baixar SDK do iOS 16.5
-          curl -fsSL https://github.com/theos/sdks/releases/download/2024-10-04/iPhoneOS16.5.sdk.tar.xz \
-            -o /tmp/sdk.tar.xz
-          tar xf /tmp/sdk.tar.xz -C $THEOS/sdks/
+          # Clonar SDKs direto do repo (contém os .sdk)
+          git clone --depth=1 https://github.com/theos/sdks.git /tmp/theos-sdks
+          cp -r /tmp/theos-sdks/*.sdk $THEOS/sdks/
 
       - name: Build .deb
         run: make package FINALPACKAGE=1
