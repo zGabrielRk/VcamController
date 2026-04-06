@@ -12,32 +12,45 @@ jobs:
   build:
     runs-on: macos-14
 
-    env:
-      THEOS: /opt/theos
-
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Theos
+      - name: Compile dylib
         run: |
-          git clone --recursive https://github.com/theos/theos.git $THEOS
+          xcrun -sdk iphoneos clang \
+            -arch arm64 \
+            -dynamiclib \
+            -fobjc-arc \
+            -framework Foundation \
+            -miphoneos-version-min=16.0 \
+            -install_name /var/jb/Library/MobileSubstrate/DynamicLibraries/VcamCompanion.dylib \
+            -o VcamCompanion.dylib \
+            VcamCompanion/Tweak.m
 
-          # Clonar SDKs direto do repo (contém os .sdk)
-          git clone --depth=1 https://github.com/theos/sdks.git /tmp/theos-sdks
-          cp -r /tmp/theos-sdks/*.sdk $THEOS/sdks/
+      - name: Install dpkg
+        run: brew install dpkg
 
-      - name: Build .deb
-        run: make package FINALPACKAGE=1
-        working-directory: VcamCompanion
+      - name: Package .deb
+        run: |
+          DEB_ROOT=deb_build
+          DYLIB_DIR=$DEB_ROOT/var/jb/Library/MobileSubstrate/DynamicLibraries
+          mkdir -p $DYLIB_DIR
+          mkdir -p $DEB_ROOT/DEBIAN
+
+          cp VcamCompanion.dylib $DYLIB_DIR/
+          cp VcamCompanion/VcamCompanion.plist $DYLIB_DIR/
+          cp VcamCompanion/control $DEB_ROOT/DEBIAN/control
+
+          dpkg-deb -b $DEB_ROOT VcamCompanion.deb
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: VcamCompanion-deb
-          path: VcamCompanion/packages/*.deb
+          path: VcamCompanion.deb
 
       - name: Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: VcamCompanion/packages/*.deb
+          files: VcamCompanion.deb
